@@ -90,8 +90,10 @@ function buildPrompts(n, opts) {
     const who = ethBag();
     const hair = gender === 'man' && /past the chest|shoulder-length/.test(pick.hair)
       ? (rand() < 0.7 ? 'short hair above the ears' : pick.hair) : pick.hair;
+    // variation = 顔ごとに変わる部分だけ。チャット形式ではこれだけを送れば足りる。
+    const variation = `${who} ${gender}, ${pick.age}, ${pick.faceShape}, ${pick.eyes}, ${pick.brows}, ${pick.nose}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}`;
     const text = `A ${FRAMING}. A ${who} ${gender}, ${pick.age}, with a ${pick.faceShape}, ${pick.eyes}, ${pick.brows}, a ${pick.nose}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}.`;
-    out.push({ index: i, gender, text, attrs: { ...pick, hair, ethnicity: who } });
+    out.push({ index: i, gender, text, variation, attrs: { ...pick, hair, ethnicity: who } });
   }
   return out;
 }
@@ -166,28 +168,71 @@ async function main() {
     // API を使わず手で生成する場合に備え、全プロンプトをファイルに書き出す
     const outDir = path.resolve(args.out);
     await fs.mkdir(outDir, { recursive: true });
-    const listPath = path.join(outDir, 'prompts.txt');
-    const header = [
-      `# 顔の好み診断 用プロンプト（${prompts.length}件）`,
-      '#',
-      '# AI Studio (https://aistudio.google.com) の画像生成モデルに1件ずつ貼り付け、',
-      `# 生成された画像を ${args.out}/ に保存してください（ファイル名は自由）。`,
-      '#',
+    const CHECKS = [
       '# 生成された画像を見るときの確認点:',
       '#   - 正面を向いているか（大きく傾いていると計測精度が落ちます）',
       '#   - 背景が無地か（雑多だと「髪の長さ」が計測できません）',
       '#   - 眉が前髪で隠れていないか',
       '# 条件から外れたものは保存しなくて構いません。足りない分は後から追加できます。',
       '#',
+      '# 重要: スクリーンショットではなく画像そのものを保存してください。',
+      '#       画面の余白やUIが写り込むと背景が無地でなくなり、髪の長さが測れません。',
+    ];
+
+    // (1) 1件ずつ完結したプロンプト（API や 1回ごとの貼り付け用）
+    const listPath = path.join(outDir, 'prompts.txt');
+    await fs.writeFile(listPath, [
+      `# 顔の好み診断 用プロンプト（${prompts.length}件）`,
+      '#',
+      '# 画像生成モデルに1件ずつ貼り付け、',
+      `# 生成された画像を ${args.out}/ に保存してください（ファイル名は自由）。`,
+      '#',
+      ...CHECKS,
+      '#',
       `# 全部そろったら:  npm run analyze -- --from ${args.out} --debug .cache/debug`,
       '',
-    ].join('\n');
-    const body = prompts.map((p) =>
-      `--- ${p.index + 1} / ${prompts.length}  (${p.gender})\n${p.text}\n`).join('\n');
-    await fs.writeFile(listPath, header + body);
+      prompts.map((p) => `--- ${p.index + 1} / ${prompts.length}  (${p.gender})\n${p.text}\n`).join('\n'),
+    ].join('\n'));
+
+    // (2) チャット形式。共通条件を最初に1回送り、以降は1行ずつ。
+    //     スマホでは長文を毎回貼り付けるのが現実的でないため。
+    const chatPath = path.join(outDir, 'prompts-chat.txt');
+    await fs.writeFile(chatPath, [
+      `# 顔の好み診断 用プロンプト（チャット形式 / ${prompts.length}件）`,
+      '#',
+      '# スマホなど、長文を毎回貼り付けるのが大変な場合はこちらを使ってください。',
+      '# 共通条件を最初に1回送り、あとは番号付きの行を1つずつ送るだけです。',
+      '#',
+      ...CHECKS,
+      '',
+      '===== 最初に1回だけ送る =====',
+      '',
+      `これから人物のポートレート写真を${prompts.length}枚つくります。毎回かならず次の条件を守ってください。`,
+      '',
+      FRAMING.split(', ').map((x) => `- ${x}`).join('\n'),
+      '',
+      'このあと人物の特徴を1行ずつ送ります。そのつど条件を満たす写真を1枚だけ生成してください。',
+      '説明文は不要です。',
+      '',
+      '===== 以降、1行ずつ送る =====',
+      '',
+      prompts.map((p) => `${p.index + 1}) ${p.variation}`).join('\n'),
+      '',
+      '===== 貼り付け回数を減らしたい場合 =====',
+      '',
+      '上の共通条件に加えて「4人を2x2に並べた1枚の画像にしてください」と指示すると、',
+      '1回で4人分つくれます。その場合は解析時に --multi を付けてください。',
+      '',
+      `  npm run analyze -- --from ${args.out} --multi --debug .cache/debug`,
+      '',
+      'ただし1人あたりの解像度は下がります。',
+      '',
+    ].join('\n'));
 
     prompts.slice(0, 3).forEach((p) => console.log(`[${p.index + 1}] ${p.text}\n`));
-    console.log(`全 ${prompts.length} 件を ${path.relative(process.cwd(), listPath)} に書き出しました（--dry-run のため生成はしていません）`);
+    console.log(`全 ${prompts.length} 件を書き出しました（--dry-run のため生成はしていません）`);
+    console.log(`  1件ずつ貼る用: ${path.relative(process.cwd(), listPath)}`);
+    console.log(`  スマホ向け  : ${path.relative(process.cwd(), chatPath)}`);
     return;
   }
   if (!key) { console.error('GEMINI_API_KEY を設定してください（https://aistudio.google.com/apikey）'); process.exit(1); }

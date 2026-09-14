@@ -342,10 +342,16 @@ async function main() {
   }
   const known = new Set(existing.map((f) => f.source));
 
-  const files = (await fs.readdir(args.from))
-    .filter((f) => /\.(jpe?g|png|webp)$/i.test(f))
-    .sort()
-    .slice(0, args.limit);
+  // スマホから持ってきた画像は HEIC/HEIF のことがあるので受け付ける
+  const IMAGE_EXT = /\.(jpe?g|png|webp|heic|heif|tiff?|gif)$/i;
+  const all = await fs.readdir(args.from);
+  const files = all.filter((f) => IMAGE_EXT.test(f)).sort().slice(0, args.limit);
+  const ignored = all.filter((f) => !IMAGE_EXT.test(f) && !f.startsWith('.') && !f.endsWith('.txt') && !f.endsWith('.json'));
+  if (ignored.length) console.log(`  対象外の拡張子のため無視: ${ignored.slice(0, 5).join(', ')}${ignored.length > 5 ? ` ほか${ignored.length - 5}件` : ''}`);
+  if (!files.length) {
+    console.error(`${args.from} に画像が見つかりません（対応形式: jpg png webp heic heif tiff gif）`);
+    process.exit(1);
+  }
 
   const detOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: args.minScore });
   const faces = [...existing];
@@ -385,7 +391,11 @@ async function main() {
       }
     } catch (e) {
       skipped++;
-      console.log(`  [skip] ${file}: ${e.message}`);
+      const heic = /\.hei[cf]$/i.test(file);
+      console.log(`  [skip] ${file}: ${e.message.split('\n')[0]}`
+        + (heic ? '\n         → sharp の標準ビルドは iPhone の HEIC(HEVC) を読めません。JPEG に変換してから渡してください。'
+                + '\n            iPhone なら「設定 → カメラ → フォーマット → 互換性優先」、'
+                + 'または PC へ転送するときに JPEG 変換する設定にすると避けられます。' : ''));
     }
   }
 
