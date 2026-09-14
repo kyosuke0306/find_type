@@ -86,10 +86,14 @@ function buildStartScreen() {
      </button>`).join('');
   state.gender = options[0]?.value ?? 'all';
 
+  // 精度は test/simulate.mjs の測定値（仮想ユーザーの好みを未知のペアで当てられた割合）
   $('rounds-choices').innerHTML = [
-    { v: 20, label: 'さくっと' }, { v: 30, label: 'おすすめ' }, { v: 45, label: 'じっくり' },
+    { v: 20, label: 'さくっと', acc: 78 },
+    { v: 30, label: 'おすすめ', acc: 83 },
+    { v: 45, label: 'じっくり', acc: 86 },
   ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
-      <span class="big">${r.v}</span><span class="sub">${r.label}</span></button>`).join('');
+      <span class="big">${r.v}</span><span class="sub">${r.label}</span>
+      <span class="acc">精度 ${r.acc}%</span></button>`).join('');
 
   bindChoices($('gender-choices'), (v) => { state.gender = v; });
   bindChoices($('rounds-choices'), (v) => { state.rounds = Number(v); });
@@ -264,7 +268,7 @@ function renderResult(r) {
 
   $('t-top').innerHTML = `${icon('crown')}好みに近い顔`;
   $('t-feat').innerHTML = `${icon('chart')}効いていた特徴`;
-  $('t-chosen').innerHTML = `${icon('heart')}選んだ顔 <span class="card-note">${r.chosen.length}枚</span>`;
+  $('t-chosen').innerHTML = `${icon('heart', { cls: 'is-heart' })}選んだ顔 <span class="card-note">${r.chosen.length}枚</span>`;
 
   const srcOf = (id) => state.byId.get(id)?.src ?? '';
   $('top-faces').innerHTML = r.top.filter((id) => srcOf(id)).map((id, i) => `
@@ -364,8 +368,8 @@ async function copyResult(r) {
 }
 
 /* ---------------- 入力 ---------------- */
-$('vs').innerHTML = icon('heartFill');
-document.querySelectorAll('.burst').forEach((b) => { b.innerHTML = icon('heartFill'); });
+$('vs').innerHTML = icon('heartFill', { cls: 'is-heart' });
+document.querySelectorAll('.burst').forEach((b) => { b.innerHTML = icon('heartFill', { cls: 'is-heart' }); });
 $('btn-undo').innerHTML = icon('undo');
 $('btn-skip').innerHTML = `${icon('skip')}<span>どちらもピンとこない</span>`;
 document.querySelectorAll('.face-card').forEach((card) => {

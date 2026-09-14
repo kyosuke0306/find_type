@@ -10,6 +10,7 @@
   --accent: #3b5b98;
   --accent-soft: #e5ecf8;
   --accent-2: #7d9ad6;
+  --heart: #ec5f8e;
   --radius: 18px;
   --shadow: 0 1px 2px rgba(20,30,60,.06), 0 10px 30px rgba(20,30,60,.09);
 }
@@ -25,6 +26,7 @@
     --accent: #7f9fe0;
     --accent-soft: #222d47;
     --accent-2: #4f6cb0;
+    --heart: #f47da8;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.45);
   }
 }
@@ -48,6 +50,7 @@ code {
   padding: .15em .45em; border-radius: 6px; word-break: break-all;
 }
 .icon { width: 1.25em; height: 1.25em; flex: none; vertical-align: -.25em; }
+.icon.is-heart { color: var(--heart); }
 
 /* ---------- 画面遷移 ---------- */
 .screen[hidden] { display: none; }
@@ -64,10 +67,30 @@ code {
 @keyframes bounce { 0%,100% { transform: translateY(0); opacity: .35; } 50% { transform: translateY(-9px); opacity: 1; } }
 
 /* ---------- スタート ---------- */
-.hero { display: flex; justify-content: center; margin: 8px 0 2px; }
+/* アイコンを貼るのではなく、地色ごと画面端まで広げて背景として見せる。
+   左右の負マージンで #app の余白を打ち消している。 */
+.hero {
+  position: relative;
+  margin: -20px -16px 20px;
+  height: 196px;
+  background: linear-gradient(155deg, #4a6da6 0%, #35538d 62%, #2b4577 100%);
+  display: grid; place-items: center;
+  overflow: hidden;
+}
+/* 背景に大きく敷いたマーク（枠からはみ出させて絵の一部に見せる） */
+.hero::before {
+  content: ""; position: absolute; left: -14%; top: -34%; width: 66%; height: 168%;
+  background: url(icons/mark.png) left center/contain no-repeat;
+  opacity: .07; transform: rotate(-8deg);
+}
+.hero::after {
+  content: ""; position: absolute; right: -10%; bottom: -55%;
+  width: 60%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.14), transparent 70%);
+}
 .hero img {
-  width: 116px; height: 116px; border-radius: 26px; display: block;
-  box-shadow: 0 10px 28px -8px rgba(59,91,152,.55), 0 2px 6px rgba(20,30,60,.15);
+  position: relative; height: 128px; width: auto; display: block;
+  filter: drop-shadow(0 10px 22px rgba(0,0,0,.3));
   animation: float 3.6s ease-in-out infinite;
 }
 @keyframes float { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-8px) rotate(1deg); } }
@@ -97,6 +120,7 @@ code {
 .choices { display: flex; gap: 8px; margin-bottom: 12px; }
 .choices.is-single { justify-content: center; }
 .choices.is-single .choice { flex: 0 0 auto; min-width: 118px; }
+.hint { font-size: .72rem; color: var(--ink-dim); text-align: center; margin: -4px 0 12px; }
 .choice {
   flex: 1 1 0; min-width: 0; padding: 12px 6px;
   border: 2px solid var(--line); background: transparent; color: var(--ink-dim);
@@ -107,6 +131,7 @@ code {
 .choice .icon { width: 1.5em; height: 1.5em; }
 .choice .sub { font-size: .68rem; opacity: .8; }
 .choice .big { font-size: 1.3rem; font-weight: 700; line-height: 1.1; color: var(--ink); }
+.choice .acc { font-size: .66rem; opacity: .75; font-variant-numeric: tabular-nums; }
 .choice.is-on .big { color: var(--accent); }
 .choice:hover { border-color: var(--accent); transform: translateY(-2px); }
 .choice.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
@@ -173,7 +198,7 @@ code {
 .burst { background: radial-gradient(circle at center, rgba(255,255,255,.55), transparent 65%); }
 .burst .icon {
   width: 62px; height: 62px;
-  color: var(--accent); stroke: #fff; stroke-width: 2.2;
+  color: var(--heart); stroke: #fff; stroke-width: 2.2;
   /* 写真の明暗にかかわらず見えるよう、白フチの外側にも影を重ねる */
   filter: drop-shadow(0 0 3px rgba(255,255,255,.95)) drop-shadow(0 4px 12px rgba(0,0,0,.4));
 }
@@ -187,7 +212,7 @@ code {
 .vs {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
   width: 38px; height: 38px; border-radius: 50%;
-  background: var(--card); border: 2px solid var(--line); color: var(--accent);
+  background: var(--card); border: 2px solid var(--line); color: var(--heart);
   display: grid; place-items: center; z-index: 2; box-shadow: var(--shadow);
   animation: beat 1.8s ease-in-out infinite;
 }

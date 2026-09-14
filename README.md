@@ -210,7 +210,7 @@ npm start
 index.html          画面
 styles.css          スタイル
 manifest.webmanifest  ホーム画面に追加したときの名前とアイコンの定義
-icons/              アプリアイコン（tools/make-icon.mjs で生成）
+icons/              アプリアイコンとマーク（tools/make-icon.mjs と tools/make-mark.mjs で生成）
 src/icons.js        画面内で使う SVG アイコン
 src/features.js     15項目の定義と、プール内順位への正規化
 src/measure.js      ランドマークと画素からの特徴量の実測
