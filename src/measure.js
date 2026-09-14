@@ -175,36 +175,43 @@ export function measurePixels(px, W, H, geo, stride = 3) {
     hair = c; hairProbe = q; break;
   }
 
-  // 髪の長さ: あごの下の一定サイズの帯で数える。
-  // 帯の大きさを d で決めているので、写真の構図や切り出し枠に左右されない。
-  const BAND_W = 1.55, BAND_H = 0.85;
-  const x0 = Math.round(chin.x - BAND_W * d), x1 = Math.round(chin.x + BAND_W * d);
-  const y0 = Math.round(chin.y), y1 = Math.round(chin.y + BAND_H * d);
-  const bx0 = Math.max(0, x0), bx1 = Math.min(W, x1);
-  const by0 = Math.max(0, y0), by1 = Math.min(H, y1);
-  const bandArea = (x1 - x0) * (y1 - y0);
-  const availArea = Math.max(0, bx1 - bx0) * Math.max(0, by1 - by0);
-  const enoughBand = bandArea > 0 && availArea >= bandArea * 0.6;
-
+  // 髪の長さ: あごの下に向かって行ごとに走査し、髪がどこまで伸びているかを両目間距離で測る。
+  //
+  // 「帯の中の髪の割合」にすると、画像が途中で切れたとき上側だけを見ることになり、
+  // 頭に近い＝髪がある側に偏って長さを過大評価してしまう。
+  // 到達点で測れば、画像が切れても「少なくともここまでは伸びている」として使える。
+  const MAX_DEPTH = 2.0, HALF_W = 1.55, ROW_MIN = 0.08;
   const near = (i, c, tol) => (Math.abs(px[i] - c.r) + Math.abs(px[i + 1] - c.g) + Math.abs(px[i + 2] - c.b)) < tol;
-  let hairPx = 0, total = 0;
-  if (hair && plainBg && enoughBand) {
-    for (let y = by0; y < by1; y++) {
-      for (let x = bx0; x < bx1; x++) {
+  const hx0 = Math.max(0, Math.round(chin.x - HALF_W * d));
+  const hx1 = Math.min(W, Math.round(chin.x + HALF_W * d));
+  const hy0 = Math.max(0, Math.round(chin.y));
+  const hy1 = Math.min(H, Math.round(chin.y + MAX_DEPTH * d));
+  const availDepth = (hy1 - hy0) / d;
+
+  let lastHairRow = -1;
+  if (hair && plainBg && hx1 > hx0) {
+    for (let y = hy0; y < hy1; y++) {
+      let c = 0, n = 0;
+      for (let x = hx0; x < hx1; x++) {
+        n++;
         const i = (y * W + x) * stride;
-        total++;
-        if (near(i, hair, 110) && !near(i, bg, 70) && !near(i, skin, 80)) hairPx++;
+        if (near(i, hair, 110) && !near(i, bg, 70) && !near(i, skin, 80)) c++;
       }
+      if (n && c / n >= ROW_MIN) lastHairRow = y;
     }
   }
-  const measurable = hair && plainBg && enoughBand && total > 0;
+  // あご下がほとんど写っていないと、長short の区別自体ができない
+  const measurable = Boolean(hair) && plainBg && availDepth >= 0.35;
+  const extent = lastHairRow < 0 ? 0 : (lastHairRow - hy0) / d;
+  // 画像の下端まで髪が続いていた場合は打ち切り（実際はもっと長い可能性がある）
+  const censored = measurable && lastHairRow >= hy1 - 1;
 
   return {
     skinTone: -lum(skin.r, skin.g, skin.b),                 // 高いほど小麦肌
     hairColor: hair ? lum(hair.r, hair.g, hair.b) : null,   // 高いほど明るい髪
-    hairLength: measurable ? hairPx / total : null,         // 高いほどロング
+    hairLength: measurable ? extent : null,                 // あご下に伸びている長さ（両目間距離を1とする）
     _skin: skin, _hair: hair, _bg: bg, _hairProbe: hairProbe,
-    _band: { x0: bx0, y0: by0, x1: bx1, y1: by1 },
-    _plainBg: plainBg, _enoughBand: enoughBand,
+    _scan: { x0: hx0, x1: hx1, y0: hy0, y1: hy1, yHair: lastHairRow },
+    _plainBg: plainBg, _availDepth: availDepth, _censored: censored,
   };
 }

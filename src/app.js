@@ -379,6 +379,7 @@ async function handleFiles(fileList) {
   if (!files.length) return;
 
   const multi = $('multi-check').checked;
+  const gender = $('gender-select').value || null;
   const log = $('import-log');
   $('import-progress').hidden = false;
   $('import-status').textContent = 'モデルを読み込み中…（初回のみ約2MB）';
@@ -401,7 +402,7 @@ async function handleFiles(fileList) {
     // 画面を更新させてから重い処理に入る
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
     try {
-      const { faces, skipped } = await analyzeFile(file, { multi });
+      const { faces, skipped } = await analyzeFile(file, { multi, gender });
       if (faces.length) {
         await putFaces(faces);
         added += faces.length;

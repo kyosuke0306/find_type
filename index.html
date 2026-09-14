@@ -35,6 +35,16 @@
         1枚に複数の人が写っている（全員取り込む）
       </label>
 
+      <div class="field" style="margin:14px 0 0">
+        <label class="field-label" for="gender-select">取り込む顔の性別</label>
+        <select id="gender-select" class="select">
+          <option value="">自動で判定する</option>
+          <option value="female">すべて女性として扱う</option>
+          <option value="male">すべて男性として扱う</option>
+        </select>
+        <p class="hint">自動判定はショートヘアの女性を男性と誤ることがあります。性別が分かっている画像をまとめて取り込むときは指定してください。</p>
+      </div>
+
       <div id="import-progress" hidden>
         <div class="progress"><div class="progress-fill" id="import-fill"></div></div>
         <p class="hint" id="import-status"></p>

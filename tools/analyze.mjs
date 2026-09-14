@@ -20,7 +20,7 @@ import { measureGeometry, measurePixels, chooseBox } from '../src/measure.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function parseArgs(argv) {
-  const a = { from: null, out: 'data/faces', json: 'data/faces.json', size: 480, minScore: 0.45, append: false, limit: Infinity, debug: null, multi: false };
+  const a = { from: null, out: 'data/faces', json: 'data/faces.json', size: 480, minScore: 0.45, append: false, limit: Infinity, debug: null, multi: false, gender: null };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--from') a.from = argv[++i];
@@ -31,10 +31,11 @@ function parseArgs(argv) {
     else if (k === '--limit') a.limit = Number(argv[++i]);
     else if (k === '--append') a.append = true;
     else if (k === '--multi') a.multi = true;
+    else if (k === '--gender') a.gender = argv[++i];
     else if (k === '--debug') a.debug = argv[++i] ?? '.cache/debug';
   }
   if (!a.from) {
-    console.error('使い方: node tools/analyze.mjs --from <画像フォルダ> [--out data/faces] [--size 480] [--append] [--multi] [--debug .cache/debug]');
+    console.error('使い方: node tools/analyze.mjs --from <画像フォルダ> [--out data/faces] [--size 480] [--append] [--multi] [--gender female|male] [--debug .cache/debug]');
     process.exit(1);
   }
   return a;
@@ -81,13 +82,18 @@ function debugOverlay(size, P0, geo, raw, ox, oy, scale, pix) {
   });
   const cl = at(-0.95, -0.85), cr = at(0.95, -0.85);
   const hp = pix._hairProbe ? toCrop(pix._hairProbe) : null;
-  const band = pix._band;
+  const scan = pix._scan;
   const samples = [
     patch(cl.x, cl.y, cheekR, '#0ff'),
     patch(cr.x, cr.y, cheekR, '#0ff'),
     hp ? patch(hp.x, hp.y, Math.max(3, d * 0.3), '#ff0') : '',
-    band ? (() => { const a = toCrop({ x: band.x0, y: band.y0 }), b = toCrop({ x: band.x1, y: band.y1 });
-      return `<rect x="${a.x.toFixed(1)}" y="${a.y.toFixed(1)}" width="${(b.x - a.x).toFixed(1)}" height="${(b.y - a.y).toFixed(1)}" fill="none" stroke="#0f0" stroke-width="2" stroke-dasharray="6 4"/>`; })() : '',
+    scan ? (() => {
+      const a = toCrop({ x: scan.x0, y: scan.y0 }), b = toCrop({ x: scan.x1, y: scan.y1 });
+      const rect = `<rect x="${a.x.toFixed(1)}" y="${a.y.toFixed(1)}" width="${(b.x - a.x).toFixed(1)}" height="${(b.y - a.y).toFixed(1)}" fill="none" stroke="#0f0" stroke-width="1.5" stroke-dasharray="6 4"/>`;
+      if (scan.yHair < 0) return rect;
+      const h = toCrop({ x: scan.x0, y: scan.yHair }).y;
+      return rect + `<line x1="${a.x.toFixed(1)}" y1="${h.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${h.toFixed(1)}" stroke="#0f0" stroke-width="3"/>`;
+    })() : '',
     `<line x1="0" y1="${chin.y.toFixed(1)}" x2="${size}" y2="${chin.y.toFixed(1)}" stroke="#fff" stroke-width="1.2" stroke-dasharray="4 4"/>`,
   ].join('');
 
@@ -97,7 +103,7 @@ function debugOverlay(size, P0, geo, raw, ox, oy, scale, pix) {
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
     <rect x="0" y="0" width="150" height="${14 + 12 * 13}" fill="rgba(0,0,0,.55)"/>
     ${lines}${samples}${marks}
-    <text x="${size - 6}" y="${size - 8}" font-size="11" fill="#fff" text-anchor="end" font-family="monospace">水色=肌 黄=髪色 緑=髪の長さ判定域</text>
+    <text x="${size - 6}" y="${size - 8}" font-size="11" fill="#fff" text-anchor="end" font-family="monospace">水色=肌 黄=髪色 緑枠=走査域 緑線=髪の下端</text>
   </svg>`);
 }
 
@@ -146,7 +152,10 @@ async function extractFace(det, ctx) {
   return {
     face: {
       id, file: outName, source,
-      gender: det.gender, genderProbability: Number(det.genderProbability.toFixed(3)),
+      // 自動判定はショートヘアの女性を男性と誤りやすいので、--gender で上書きできる
+      gender: args.gender ?? det.gender,
+      genderProbability: args.gender ? 1 : Number(det.genderProbability.toFixed(3)),
+      detectedGender: det.gender,
       age: Number(det.age.toFixed(1)),
       detScore: Number(det.detection.score.toFixed(3)),
       raw: Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Number.isFinite(v) ? Number(v.toFixed(5)) : null])),

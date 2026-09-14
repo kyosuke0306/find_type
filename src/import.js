@@ -88,7 +88,7 @@ const toBlob = (canvas, type, q) => new Promise((res) => canvas.toBlob(res, type
  * 画像ファイル1つを解析し、見つかった顔ごとの結果を返す。
  * @returns {Promise<{faces: Array, skipped: Array<string>}>}
  */
-export async function analyzeFile(file, { multi = false, minScore = 0.45 } = {}) {
+export async function analyzeFile(file, { multi = false, minScore = 0.45, gender = null } = {}) {
   await loadModels();
   const work = await toWorkCanvas(file);
   const opts = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: minScore });
@@ -122,8 +122,10 @@ export async function analyzeFile(file, { multi = false, minScore = 0.45 } = {})
     faces.push({
       id: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}${k}`,
       blob: await toBlob(crop, 'image/jpeg', 0.82),
-      gender: det.gender,
-      genderProbability: Number(det.genderProbability.toFixed(3)),
+      // 自動判定はショートヘアの女性を男性と誤りやすいので、呼び出し側で上書きできる
+      gender: gender ?? det.gender,
+      genderProbability: gender ? 1 : Number(det.genderProbability.toFixed(3)),
+      detectedGender: det.gender,
       age: Number(det.age.toFixed(1)),
       detScore: Number(det.detection.score.toFixed(3)),
       raw: Object.fromEntries(Object.entries(raw).map(([key, v]) => [key, Number.isFinite(v) ? Number(v.toFixed(5)) : null])),
