@@ -10,6 +10,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { FEATURES, KEYS, normalizePool } from '../src/features.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -65,8 +66,97 @@ const FRAMING_PARTS = [
 ];
 const FRAMING = FRAMING_PARTS.join(', ');
 
+// 弱い項目を狙って埋めるときに使う、項目ごとの端の言い回し。
+// 診断項目とプロンプトの語を1対1で結びつけておく。
+const FILL_PHRASES = {
+  faceLength:  ['a round wide face', 'a long narrow face'],
+  jawSharp:    ['a soft rounded jawline', 'a sharp pointed chin'],
+  eyeSize:     ['narrow slit-like eyes', 'very large round eyes'],
+  eyeTilt:     ['droopy downturned outer eye corners', 'sharply upturned outer eye corners'],
+  eyeDistance: ['close-set eyes', 'wide-set eyes'],
+  browEyeGap:  ['eyebrows sitting very close to the eyes', 'eyebrows set high above the eyes'],
+  browAngle:   ['downward-slanting eyebrows', 'sharply upward-angled eyebrows'],
+  browArch:    ['straight flat eyebrows', 'strongly arched eyebrows'],
+  noseWidth:   ['a narrow slender nose', 'a wide nose with broad nostrils'],
+  mouthWidth:  ['a small narrow mouth', 'a wide mouth'],
+  lipThick:    ['very thin lips', 'very full plump lips'],
+  ageLook:     ['18 years old', '37 years old'],
+  skinTone:    ['very fair porcelain skin', 'tanned skin'],
+  hairColor:   ['jet black hair', 'dyed bleached blonde hair'],
+  hairLength:  ['very short cropped hair', 'very long hair past the chest'],
+};
+
+/**
+ * 既存のプールを調べ、足りていない組み合わせを「目標」として並べる。
+ * 精度が上がらない原因は主に2つある。
+ *   1. その項目の端にあたる顔が少ない（片寄り）
+ *   2. 2つの項目が相関していて切り分けられない
+ * 1 には足りない端を、2 には逆の組み合わせを作らせる。
+ */
+function planFill(faces) {
+  const pool = normalizePool(faces);
+  const targets = [];
+
+  // 1. 端が少ない項目
+  for (const [i, k] of KEYS.entries()) {
+    const xs = faces.map((f) => f.raw[k]).filter(Number.isFinite).sort((a, b) => a - b);
+    if (xs.length < 5) continue;
+    const lo = xs[0], hi = xs[xs.length - 1], range = hi - lo;
+    const t1 = lo + range / 3, t2 = lo + range * 2 / 3;
+    const low = xs.filter((x) => x < t1).length, high = xs.filter((x) => x >= t2).length;
+    const even = xs.length / 3;
+    if (low < even * 0.6) targets.push({ why: `${FEATURES[i].name}の「${FEATURES[i].lowTag}」側が少ない`, set: { [k]: 0 } });
+    if (high < even * 0.6) targets.push({ why: `${FEATURES[i].name}の「${FEATURES[i].highTag}」側が少ない`, set: { [k]: 1 } });
+  }
+
+  // 2. 相関している組
+  const corr = [];
+  for (let a = 0; a < KEYS.length; a++) for (let b = a + 1; b < KEYS.length; b++) {
+    const xs = pool.map((f) => f.v[KEYS[a]]), ys = pool.map((f) => f.v[KEYS[b]]);
+    const mx = xs.reduce((s, x) => s + x, 0) / xs.length, my = ys.reduce((s, y) => s + y, 0) / ys.length;
+    let num = 0, dx = 0, dy = 0;
+    for (let i = 0; i < xs.length; i++) { num += (xs[i] - mx) * (ys[i] - my); dx += (xs[i] - mx) ** 2; dy += (ys[i] - my) ** 2; }
+    const r = num / Math.sqrt(dx * dy);
+    if (Math.abs(r) > 0.5) corr.push({ a: KEYS[a], b: KEYS[b], ia: a, ib: b, r });
+  }
+  corr.sort((x, y) => Math.abs(y.r) - Math.abs(x.r));
+  for (const c of corr.slice(0, 6)) {
+    // 相関を崩すには、これまで出ていない側の組み合わせを作る
+    const [p, q] = c.r > 0 ? [[0, 1], [1, 0]] : [[0, 0], [1, 1]];
+    for (const [va, vb] of [p, q]) {
+      targets.push({
+        why: `${FEATURES[c.ia].name}と${FEATURES[c.ib].name}が相関(${c.r.toFixed(2)})していて切り分けられない`,
+        set: { [c.a]: va, [c.b]: vb },
+      });
+    }
+  }
+  return targets;
+}
+
+/** 目標を満たすプロンプトを作る。指定のない項目は適当に散らす。 */
+function buildFillPrompts(targets, n, opts) {
+  const rand = mulberry(opts.seed);
+  const vibe = VIBE[opts.vibe] ?? VIBE.cute;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const tgt = targets[i % targets.length];
+    const set = { ...tgt.set };
+    // 指定のない項目は半分くらいをランダムに決める（全部入れると指示が長すぎる）
+    for (const k of KEYS) if (!(k in set) && rand() < 0.45) set[k] = rand() < 0.5 ? 0 : 1;
+    const age = set.ageLook !== undefined ? FILL_PHRASES.ageLook[set.ageLook] : AXES.age[Math.floor(rand() * AXES.age.length)];
+    const phrases = KEYS.filter((k) => k !== 'ageLook' && k in set).map((k) => FILL_PHRASES[k][set[k]]);
+    const variation = `Japanese woman, ${age}, ${phrases.join(', ')}`;
+    out.push({
+      index: i, gender: 'woman', why: tgt.why,
+      variation,
+      text: `A ${FRAMING}. A ${vibe} ${variation}.`,
+    });
+  }
+  return out;
+}
+
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'cute', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'cute', fill: null, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -75,6 +165,7 @@ function parseArgs(argv) {
     else if (k === '--image-size') a.imageSize = argv[++i];
     else if (k === '--ethnicity') a.ethnicity = argv[++i];
     else if (k === '--vibe') a.vibe = argv[++i];
+    else if (k === '--fill') a.fill = argv[++i] ?? 'data/faces.json';
     else if (k === '--female-ratio') a.femaleRatio = Number(argv[++i]);
     else if (k === '--concurrency') a.concurrency = Number(argv[++i]);
     else if (k === '--seed') a.seed = Number(argv[++i]);
@@ -190,7 +281,19 @@ async function main() {
     return listModels(key);
   }
 
-  const prompts = buildPrompts(args.count, args);
+  let prompts, fillNote = '';
+  if (args.fill) {
+    const faces = JSON.parse(await fs.readFile(path.resolve(args.fill), 'utf8')).faces;
+    const targets = planFill(faces);
+    if (!targets.length) { console.log('補うべき弱点は見つかりませんでした。'); return; }
+    prompts = buildFillPrompts(targets, args.count, args);
+    fillNote = `既存 ${faces.length} 枚の弱点を補う指定です。`;
+    console.log(`弱点 ${targets.length} 件に対して ${args.count} 件のプロンプトを作ります:`);
+    for (const t of [...new Set(targets.map((t) => t.why))]) console.log(`  - ${t}`);
+    console.log();
+  } else {
+    prompts = buildPrompts(args.count, args);
+  }
   if (args.dryRun) {
     // API を使わず手で生成する場合に備え、全プロンプトをファイルに書き出す
     const outDir = path.resolve(args.out);
@@ -226,6 +329,7 @@ async function main() {
     const chatPath = path.join(outDir, 'prompts-chat.txt');
     await fs.writeFile(chatPath, [
       `# 顔の好み診断 用プロンプト（チャット形式 / ${prompts.length}件）`,
+      ...(fillNote ? ['#', `# ${fillNote}`] : []),
       '#',
       '# スマホなど、長文を毎回貼り付けるのが大変な場合はこちらを使ってください。',
       '# 共通条件を最初に1回送り、あとは番号付きの行を1つずつ送るだけです。',
@@ -244,7 +348,7 @@ async function main() {
       '',
       '===== 以降、1行ずつ送る =====',
       '',
-      prompts.map((p) => `${p.index + 1}) ${p.variation}`).join('\n'),
+      prompts.map((p) => (p.why ? `# ${p.why}\n` : '') + `${p.index + 1}) ${p.variation}`).join('\n\n'),
       '',
       '===== 貼り付け回数を減らしたい場合 =====',
       '',
