@@ -67,30 +67,35 @@ code {
 @keyframes bounce { 0%,100% { transform: translateY(0); opacity: .35; } 50% { transform: translateY(-9px); opacity: 1; } }
 
 /* ---------- スタート ---------- */
-/* アイコンを貼るのではなく、地色ごと画面端まで広げて背景として見せる。
-   左右の負マージンで #app の余白を打ち消している。 */
+/* アイコンを貼るのではなく、地色をページの背景として上部に溶け込ませる。
+   左右は負マージンで #app の余白を打ち消し、下は透明へ落として境目をなくす。
+   透明側の RGB を地色と同じにしておくと、途中でくすまずに消える。 */
 .hero {
   position: relative;
-  margin: -20px -16px 20px;
-  height: 196px;
-  background: linear-gradient(155deg, #4a6da6 0%, #35538d 62%, #2b4577 100%);
-  display: grid; place-items: center;
+  margin: -20px -16px -46px;
+  height: 252px;
+  padding-top: 30px;
+  display: grid; place-items: start center;
   overflow: hidden;
+  background: linear-gradient(180deg,
+              #33508a 0%, #41639c 34%, rgba(65,99,156,0) 82%);
 }
-/* 背景に大きく敷いたマーク（枠からはみ出させて絵の一部に見せる） */
+/* 背景に大きく敷いたマーク。こちらも下へ向かって消す。 */
 .hero::before {
-  content: ""; position: absolute; left: -14%; top: -34%; width: 66%; height: 168%;
-  background: url(icons/mark.png) left center/contain no-repeat;
-  opacity: .07; transform: rotate(-8deg);
+  content: ""; position: absolute; left: -14%; top: -18%; width: 64%; height: 120%;
+  background: url(icons/mark.png) left top/contain no-repeat;
+  opacity: .08; transform: rotate(-8deg);
+  -webkit-mask-image: linear-gradient(180deg, #000 45%, transparent 85%);
+  mask-image: linear-gradient(180deg, #000 45%, transparent 85%);
 }
 .hero::after {
-  content: ""; position: absolute; right: -10%; bottom: -55%;
-  width: 60%; aspect-ratio: 1; border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,255,255,.14), transparent 70%);
+  content: ""; position: absolute; right: -12%; top: -18%;
+  width: 62%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,.15), transparent 68%);
 }
 .hero img {
-  position: relative; height: 128px; width: auto; display: block;
-  filter: drop-shadow(0 10px 22px rgba(0,0,0,.3));
+  position: relative; height: 132px; width: auto; display: block;
+  filter: drop-shadow(0 10px 22px rgba(20,35,70,.35));
   animation: float 3.6s ease-in-out infinite;
 }
 @keyframes float { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-8px) rotate(1deg); } }
