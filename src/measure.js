@@ -100,19 +100,17 @@ export function samplePatch(px, W, H, cx, cy, r, stride = 3) {
  * 広いほど頭と肩がよく入るが、画像に収まらなければ意味がないので、
  * 収まる範囲でできるだけ広い枠を選ぶ。単位は両目間距離 d。
  */
-export function chooseBox(geo, W, H) {
-  const make = (mult) => {
-    const box = Math.round(geo._d * mult);
-    const ox = Math.round(geo._eyeMid.x - box / 2);
-    const oy = Math.round(geo._eyeMid.y - box * 0.30);
-    const pad = Math.max(-ox, -oy, ox + box - W, oy + box - H, 0);
-    return { box, ox, oy, pad, mult };
-  };
-  for (const mult of [6.6, 5.8, 5.0, 4.4, 3.8, 3.2]) {
-    const c = make(mult);
-    if (c.pad <= c.box * 0.08) return c;
-  }
-  return make(3.2);   // どれも収まらなければ最小の枠。はみ出し分は呼び出し側で埋める。
+export function chooseBox(geo, W, H, headTop = null) {
+  const d = geo._d;
+  // 頭頂が実測できていればそこを基準にする。できなければ両目の間隔から見積もる。
+  const top = Math.round((headTop ?? (geo._eyeMid.y - 1.75 * d)) - d * 0.16);
+  // あごの下も入れておく（髪の長さは別に元画像で測るが、見た目として肩まで欲しい）
+  const need = (geo._chin.y + d * 0.95) - top;
+  const box = Math.round(Math.min(d * 6.6, Math.max(need, d * 4.0)));
+  const ox = Math.round(geo._eyeMid.x - box / 2);
+  const oy = top;
+  const pad = Math.max(-ox, -oy, ox + box - W, oy + box - H, 0);
+  return { box, ox, oy, pad };
 }
 
 /**
@@ -206,12 +204,28 @@ export function measurePixels(px, W, H, geo, stride = 3) {
   // 画像の下端まで髪が続いていた場合は打ち切り（実際はもっと長い可能性がある）
   const censored = measurable && lastHairRow >= hy1 - 1;
 
+  // 頭頂の位置を実測する。両目の間隔からの推定では髪型によって外れるため、
+  // 背景が無地であることを利用して、上から見て最初に人物が現れる行を探す。
+  let headTop = null;
+  if (plainBg) {
+    const sx = Math.max(0, Math.round(eyeMid.x - 1.7 * d));
+    const ex = Math.min(W, Math.round(eyeMid.x + 1.7 * d));
+    const limit = Math.min(H, Math.round(eyeMid.y));
+    outer: for (let y = 0; y < limit; y++) {
+      let run = 0;
+      for (let x = sx; x < ex; x++) {
+        const i = (y * W + x) * stride;
+        if (!near(i, bg, 70)) { if (++run >= 4) { headTop = y; break outer; } } else run = 0;
+      }
+    }
+  }
+
   return {
     skinTone: -lum(skin.r, skin.g, skin.b),                 // 高いほど小麦肌
     hairColor: hair ? lum(hair.r, hair.g, hair.b) : null,   // 高いほど明るい髪
     hairLength: measurable ? extent : null,                 // あご下に伸びている長さ（両目間距離を1とする）
     _skin: skin, _hair: hair, _bg: bg, _hairProbe: hairProbe,
     _scan: { x0: hx0, x1: hx1, y0: hy0, y1: hy1, yHair: lastHairRow },
-    _plainBg: plainBg, _availDepth: availDepth, _censored: censored,
+    _plainBg: plainBg, _availDepth: availDepth, _censored: censored, _headTop: headTop,
   };
 }

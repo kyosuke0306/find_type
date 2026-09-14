@@ -120,7 +120,7 @@ async function extractFace(det, ctx) {
   const pix = measurePixels(full.data, full.info.width, full.info.height, geo, 3);
 
   // 表示用の切り出し。画像に収まる範囲でできるだけ広く取る。
-  const { box, ox, oy, pad } = chooseBox(geo, W0, H0);
+  const { box, ox, oy, pad } = chooseBox(geo, W0, H0, pix._headTop);
   if (pad > box * 0.25) return { reason: '顔が画像の端に寄りすぎ' };
 
   const padL = Math.max(0, -ox), padT = Math.max(0, -oy);
@@ -130,8 +130,12 @@ async function extractFace(det, ctx) {
 
   let region = sharp(workPng).extract({ left: exLeft, top: exTop, width: exW, height: exH });
   if (padL || padT || padR || padB) {
-    // はみ出す分は縁の画素を引き伸ばして埋め、結果を必ず box × box にする
-    region = region.extend({ left: padL, top: padT, right: padR, bottom: padB, extendWith: 'copy' });
+    // はみ出す分を埋めて、結果を必ず box × box にする。
+    // 背景が無地なら背景色で埋めると継ぎ目が出ない。そうでなければ縁を引き伸ばす。
+    const ext = { left: padL, top: padT, right: padR, bottom: padB };
+    region = pix._plainBg && pix._bg
+      ? region.extend({ ...ext, background: { r: Math.round(pix._bg.r), g: Math.round(pix._bg.g), b: Math.round(pix._bg.b) } })
+      : region.extend({ ...ext, extendWith: 'copy' });
   }
   const cropPng = await region.resize(args.size, args.size, { fit: 'fill' }).png().toBuffer();
 

@@ -22,7 +22,9 @@ const AXES = {
   hair: ['very short cropped hair', 'short hair above the ears', 'chin-length bob', 'shoulder-length hair', 'long hair past the chest'],
   hairColor: ['jet black hair', 'dark brown hair', 'light brown hair', 'ash grey hair', 'blonde hair'],
   skin: ['fair pale skin', 'light skin', 'medium olive skin', 'tan brown skin', 'deep brown skin'],
-  age: ['18 years old', '22 years old', '27 years old', '33 years old', '41 years old'],
+  // 「若くてかわいい人の中で好みを診断する」ため年齢は狭めに取る。
+  // ただし完全に同じにすると「顔立ちの印象」の軸が測れなくなるので幅は残す。
+  age: ['18 years old', '20 years old', '22 years old', '25 years old', '28 years old'],
 };
 
 const ETHNICITY = {
@@ -34,6 +36,12 @@ const ETHNICITY = {
 
 // 日本人・東アジア系に限定するときは、肌と髪の選択肢を現実的な範囲に差し替える。
 // 「deep brown skin の日本人」のような矛盾した指定を避けるため。
+// 生成する人物の雰囲気。--vibe で切り替える。
+const VIBE = {
+  cute: 'cute and pretty, youthful and fresh-faced, clear healthy skin',
+  neutral: '',
+};
+
 const EAST_ASIAN_AXES = {
   skin: ['very fair porcelain skin', 'fair skin', 'light skin with warm undertone', 'medium skin tone', 'lightly tanned skin'],
   hairColor: ['jet black hair', 'dark brown hair', 'dyed light brown hair', 'dyed ash brown hair', 'dyed bleached blonde hair'],
@@ -55,7 +63,7 @@ const FRAMING_PARTS = [
 const FRAMING = FRAMING_PARTS.join(', ');
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'cute', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -63,6 +71,7 @@ function parseArgs(argv) {
     else if (k === '--model') a.model = argv[++i];
     else if (k === '--image-size') a.imageSize = argv[++i];
     else if (k === '--ethnicity') a.ethnicity = argv[++i];
+    else if (k === '--vibe') a.vibe = argv[++i];
     else if (k === '--female-ratio') a.femaleRatio = Number(argv[++i]);
     else if (k === '--concurrency') a.concurrency = Number(argv[++i]);
     else if (k === '--seed') a.seed = Number(argv[++i]);
@@ -105,7 +114,9 @@ function buildPrompts(n, opts) {
       ? (rand() < 0.7 ? 'short hair above the ears' : pick.hair) : pick.hair;
     // variation = 顔ごとに変わる部分だけ。チャット形式ではこれだけを送れば足りる。
     const variation = `${who} ${gender}, ${pick.age}, ${pick.faceShape}, ${pick.eyes}, ${pick.brows}, ${pick.nose}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}`;
-    const text = `A ${FRAMING}. A ${who} ${gender}, ${pick.age}, with a ${pick.faceShape}, ${pick.eyes}, ${pick.brows}, a ${pick.nose}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}.`;
+    const vibe = VIBE[opts.vibe] ?? VIBE.cute;
+    const who2 = vibe ? `${vibe} ${who}` : who;
+    const text = `A ${FRAMING}. A ${who2} ${gender}, ${pick.age}, with a ${pick.faceShape}, ${pick.eyes}, ${pick.brows}, a ${pick.nose}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}.`;
     out.push({ index: i, gender, text, variation, attrs: { ...pick, hair, ethnicity: who } });
   }
   return out;
@@ -223,6 +234,7 @@ async function main() {
       `これから人物のポートレート写真を${prompts.length}枚つくります。毎回かならず次の条件を守ってください。`,
       '',
       FRAMING_PARTS.map((x) => `- ${x}`).join('\n'),
+      ...(VIBE[args.vibe] ?? VIBE.cute ? [`- ${VIBE[args.vibe] ?? VIBE.cute}`] : []),
       '',
       'このあと人物の特徴を1行ずつ送ります。そのつど条件を満たす写真を1枚だけ生成してください。',
       '説明文は不要です。',
