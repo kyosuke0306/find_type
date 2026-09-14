@@ -40,15 +40,19 @@ const EAST_ASIAN_AXES = {
 };
 
 // 全カット共通の構図指定。ここがぶれると肌色・髪の長さの実測が狂う。
-const FRAMING = [
-  'head and shoulders portrait photograph',
+const FRAMING_PARTS = [
+  'head and shoulders portrait photograph, square 1:1 composition',
+  'the whole head and both shoulders visible, with clear empty space above the head and below the shoulders',
+  'the head takes up about half of the image height, not filling the frame',
   'facing the camera directly, head straight, eyes looking at the camera',
   'neutral relaxed expression, mouth closed',
   'plain light grey seamless studio background',
   'soft even frontal lighting, no harsh shadows',
+  'wearing a plain light grey crew-neck t-shirt',
   'sharp focus, photorealistic, 50mm lens, natural skin texture',
   'no glasses, no hat, no jewelry, no visible makeup product, hair not covering the eyebrows',
-].join(', ');
+];
+const FRAMING = FRAMING_PARTS.join(', ');
 
 function parseArgs(argv) {
   const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
@@ -218,7 +222,7 @@ async function main() {
       '',
       `これから人物のポートレート写真を${prompts.length}枚つくります。毎回かならず次の条件を守ってください。`,
       '',
-      FRAMING.split(', ').map((x) => `- ${x}`).join('\n'),
+      FRAMING_PARTS.map((x) => `- ${x}`).join('\n'),
       '',
       'このあと人物の特徴を1行ずつ送ります。そのつど条件を満たす写真を1枚だけ生成してください。',
       '説明文は不要です。',

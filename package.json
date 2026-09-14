@@ -8,7 +8,8 @@
     "start": "node tools/serve.mjs",
     "generate": "node tools/generate.mjs",
     "analyze": "node tools/analyze.mjs",
-    "test": "node test/simulate.mjs 30 60"
+    "test": "node test/simulate.mjs 30 60",
+    "noise-check": "node tools/noise-check.mjs"
   },
   "devDependencies": {
     "@tensorflow/tfjs": "4.22.0",

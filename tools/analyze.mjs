@@ -15,7 +15,7 @@ import sharp from 'sharp';
 import * as tf from '@tensorflow/tfjs';
 import * as wasmBackend from '@tensorflow/tfjs-backend-wasm';
 import * as faceapi from '@vladmandic/face-api/dist/face-api.node-wasm.js';
-import { measureGeometry, measurePixels } from '../src/measure.js';
+import { measureGeometry, measurePixels, chooseBox } from '../src/measure.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -62,7 +62,7 @@ async function initModels() {
  * 切り出し画像の上に、検出したランドマークと肌/髪の採取位置、
  * 主要な実測値を描いた画像を書き出す。実測が破綻していないかを目で確かめるためのもの。
  */
-function debugOverlay(size, P0, geo, raw, ox, oy, scale, hairProbe) {
+function debugOverlay(size, P0, geo, raw, ox, oy, scale, pix) {
   const toCrop = (p) => ({ x: (p.x - ox) * scale, y: (p.y - oy) * scale });
   const pts = P0.map(toCrop);
   const d = geo._d * scale;
@@ -80,13 +80,15 @@ function debugOverlay(size, P0, geo, raw, ox, oy, scale, hairProbe) {
     y: eye.y + geo._right.y * sideways * d + geo._up.y * upward * d,
   });
   const cl = at(-0.95, -0.85), cr = at(0.95, -0.85);
-  // hairProbe はすでに切り出し座標なので変換しない
-  const hp = hairProbe;
+  const hp = pix._hairProbe ? toCrop(pix._hairProbe) : null;
+  const band = pix._band;
   const samples = [
     patch(cl.x, cl.y, cheekR, '#0ff'),
     patch(cr.x, cr.y, cheekR, '#0ff'),
     hp ? patch(hp.x, hp.y, Math.max(3, d * 0.3), '#ff0') : '',
-    `<line x1="0" y1="${chin.y.toFixed(1)}" x2="${size}" y2="${chin.y.toFixed(1)}" stroke="#fff" stroke-width="1.5" stroke-dasharray="5 4"/>`,
+    band ? (() => { const a = toCrop({ x: band.x0, y: band.y0 }), b = toCrop({ x: band.x1, y: band.y1 });
+      return `<rect x="${a.x.toFixed(1)}" y="${a.y.toFixed(1)}" width="${(b.x - a.x).toFixed(1)}" height="${(b.y - a.y).toFixed(1)}" fill="none" stroke="#0f0" stroke-width="2" stroke-dasharray="6 4"/>`; })() : '',
+    `<line x1="0" y1="${chin.y.toFixed(1)}" x2="${size}" y2="${chin.y.toFixed(1)}" stroke="#fff" stroke-width="1.2" stroke-dasharray="4 4"/>`,
   ].join('');
 
   const lines = ['faceLength', 'jawSharp', 'eyeSize', 'eyeTilt', 'eyeDistance', 'noseWidth', 'mouthWidth', 'lipThick', 'skinTone', 'hairColor', 'hairLength', 'ageLook']
@@ -95,7 +97,7 @@ function debugOverlay(size, P0, geo, raw, ox, oy, scale, hairProbe) {
   return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}">
     <rect x="0" y="0" width="150" height="${14 + 12 * 13}" fill="rgba(0,0,0,.55)"/>
     ${lines}${samples}${marks}
-    <text x="${size - 6}" y="${size - 8}" font-size="11" fill="#fff" text-anchor="end" font-family="monospace">水色=肌 黄=髪 破線=あご</text>
+    <text x="${size - 6}" y="${size - 8}" font-size="11" fill="#fff" text-anchor="end" font-family="monospace">水色=肌 黄=髪色 緑=髪の長さ判定域</text>
   </svg>`);
 }
 
@@ -106,35 +108,29 @@ function debugOverlay(size, P0, geo, raw, ox, oy, scale, hairProbe) {
 async function extractFace(det, ctx) {
   const { workPng, W0, H0, id, source, args, outDir, debugDir } = ctx;
   const geo = measureGeometry(det.landmarks.positions);
-  const d = geo._d;
 
-  // 頭と肩が入る正方形で切り出す。
-  // 髪の長さは「あごより下に髪がどれだけ広がっているか」で測るので、
-  // あご下に十分な余白（切り出しの約35%）が残る大きさにする。
-  const box = Math.round(d * 6.6);
-  const ox = Math.round(geo._eyeMid.x - box / 2);
-  const oy = Math.round(geo._eyeMid.y - box * 0.30);
+  // 画素の計測は元画像に対して行う。切り出し枠の外まで見る必要があるため。
+  const full = await sharp(workPng).raw().toBuffer({ resolveWithObject: true });
+  const pix = measurePixels(full.data, full.info.width, full.info.height, geo, 3);
 
-  // 画像からはみ出す分は縁を引き伸ばして埋め、切り出し結果を必ず box × box にする。
-  // こうしないと縦横比が変わり、ランドマークと画素の対応がずれる。
+  // 表示用の切り出し。画像に収まる範囲でできるだけ広く取る。
+  const { box, ox, oy, pad } = chooseBox(geo, W0, H0);
+  if (pad > box * 0.25) return { reason: '顔が画像の端に寄りすぎ' };
+
   const padL = Math.max(0, -ox), padT = Math.max(0, -oy);
   const padR = Math.max(0, ox + box - W0), padB = Math.max(0, oy + box - H0);
-  if (Math.max(padL, padT, padR, padB) > box * 0.25) return { reason: '顔が画像の端に寄りすぎ' };
-
   const exLeft = ox + padL, exTop = oy + padT;
   const exW = box - padL - padR, exH = box - padT - padB;
 
   let region = sharp(workPng).extract({ left: exLeft, top: exTop, width: exW, height: exH });
   if (padL || padT || padR || padB) {
+    // はみ出す分は縁の画素を引き伸ばして埋め、結果を必ず box × box にする
     region = region.extend({ left: padL, top: padT, right: padR, bottom: padB, extendWith: 'copy' });
   }
   const cropPng = await region.resize(args.size, args.size, { fit: 'fill' }).png().toBuffer();
 
   const outName = `${id}.jpg`;
   await sharp(cropPng).jpeg({ quality: 82, mozjpeg: true }).toFile(path.join(outDir, outName));
-  const cropRaw = await sharp(cropPng).raw().toBuffer({ resolveWithObject: true });
-  const scale = args.size / box;
-  const pix = measurePixels(cropRaw.data, cropRaw.info.width, cropRaw.info.height, geo, scale, ox, oy);
 
   const raw = {};
   for (const [k, v] of Object.entries(geo)) if (!k.startsWith('_')) raw[k] = v;
@@ -143,7 +139,7 @@ async function extractFace(det, ctx) {
 
   if (debugDir) {
     await sharp(cropPng)
-      .composite([{ input: debugOverlay(args.size, det.landmarks.positions, geo, raw, ox, oy, scale, pix._hairProbe), top: 0, left: 0 }])
+      .composite([{ input: debugOverlay(args.size, det.landmarks.positions, geo, raw, ox, oy, args.size / box, pix), top: 0, left: 0 }])
       .jpeg({ quality: 88 }).toFile(path.join(debugDir, outName));
   }
 

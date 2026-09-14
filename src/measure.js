@@ -95,29 +95,59 @@ export function samplePatch(px, W, H, cx, cy, r, stride = 3) {
  * 切り出し済み画像の画素から、肌の明るさ・髪の明るさ・髪の長さを推定する。
  * 髪の長さは「頭頂部で採取した髪色に近い画素が、あごより下にどれだけ広がっているか」で測る。
  */
-export function measurePixels(px, W, H, geo, scale, ox, oy, stride = 3) {
-  // stride は 1 画素あたりの要素数。Node の raw は RGB(3)、ブラウザの canvas は RGBA(4)。
-  const toCrop = (p) => ({ x: Math.round((p.x - ox) * scale), y: Math.round((p.y - oy) * scale) });
-  const d = geo._d * scale;
-  const eyeMid = toCrop(geo._eyeMid);
-  const chin = toCrop(geo._chin);
+/**
+ * 表示用の切り出し枠を決める。
+ * 広いほど頭と肩がよく入るが、画像に収まらなければ意味がないので、
+ * 収まる範囲でできるだけ広い枠を選ぶ。単位は両目間距離 d。
+ */
+export function chooseBox(geo, W, H) {
+  const make = (mult) => {
+    const box = Math.round(geo._d * mult);
+    const ox = Math.round(geo._eyeMid.x - box / 2);
+    const oy = Math.round(geo._eyeMid.y - box * 0.30);
+    const pad = Math.max(-ox, -oy, ox + box - W, oy + box - H, 0);
+    return { box, ox, oy, pad, mult };
+  };
+  for (const mult of [6.6, 5.8, 5.0, 4.4, 3.8, 3.2]) {
+    const c = make(mult);
+    if (c.pad <= c.box * 0.08) return c;
+  }
+  return make(3.2);   // どれも収まらなければ最小の枠。はみ出し分は呼び出し側で埋める。
+}
 
-  // 頬（目と口の外側）から肌色を採る
-  const cheekR = Math.max(3, Math.round(d * 0.22));
+/**
+ * 画素から肌・髪を計測する。座標は元画像（検出に使った作業画像）のまま扱う。
+ * 切り出し画像ではなく元画像を見るのは、髪の長さを測る帯が
+ * 切り出し枠の外にはみ出しても、あるだけの画素で測れるようにするため。
+ *
+ * @param stride 1画素あたりの要素数。Node の raw は RGB(3)、ブラウザの canvas は RGBA(4)。
+ */
+export function measurePixels(px, W, H, geo, stride = 3) {
+  const d = geo._d;
+  const eyeMid = geo._eyeMid;
+  const chin = geo._chin;
+
+  // 採取位置は「画像の上」ではなく「顔の上」を基準にする。
+  // 顔が傾いた写真でも、頬と髪を狙った位置から採れるようにするため。
   const at = (sideways, upward) => ({
     x: Math.round(eyeMid.x + geo._right.x * sideways * d + geo._up.x * upward * d),
     y: Math.round(eyeMid.y + geo._right.y * sideways * d + geo._up.y * upward * d),
   });
-  const cheekL = at(-0.95, -0.85), cheekRt = at(0.95, -0.85);
-  const cheeks = [
-    samplePatch(px, W, H, cheekL.x, cheekL.y, cheekR, stride),
-    samplePatch(px, W, H, cheekRt.x, cheekRt.y, cheekR, stride),
-  ].filter(Boolean);
-  const skin = cheeks.length
-    ? { r: mean(cheeks.map((c) => ({ x: c.r, y: 0 }))).x, g: mean(cheeks.map((c) => ({ x: c.g, y: 0 }))).x, b: mean(cheeks.map((c) => ({ x: c.b, y: 0 }))).x }
-    : { r: 200, g: 170, b: 150 };
 
-  // 背景色は四隅から推定（生成画像は無地背景を想定）
+  // 頬から肌色を採る
+  const cheekR = Math.max(3, Math.round(d * 0.22));
+  const cl = at(-0.95, -0.85), cr = at(0.95, -0.85);
+  const cheeks = [
+    samplePatch(px, W, H, cl.x, cl.y, cheekR, stride),
+    samplePatch(px, W, H, cr.x, cr.y, cheekR, stride),
+  ].filter(Boolean);
+  const skin = cheeks.length ? {
+    r: cheeks.reduce((s, c) => s + c.r, 0) / cheeks.length,
+    g: cheeks.reduce((s, c) => s + c.g, 0) / cheeks.length,
+    b: cheeks.reduce((s, c) => s + c.b, 0) / cheeks.length,
+  } : { r: 200, g: 170, b: 150 };
+
+  // 背景色は四隅から推定（無地背景を想定）
   const corners = [
     samplePatch(px, W, H, 4, 4, 4, stride), samplePatch(px, W, H, W - 5, 4, 4, stride),
     samplePatch(px, W, H, 4, H - 5, 4, stride), samplePatch(px, W, H, W - 5, H - 5, 4, stride),
@@ -145,27 +175,36 @@ export function measurePixels(px, W, H, geo, scale, ox, oy, stride = 3) {
     hair = c; hairProbe = q; break;
   }
 
-  // あごより下の左右領域で「髪色に近い/背景でも肌でもない」画素の割合 = 髪の長さ
+  // 髪の長さ: あごの下の一定サイズの帯で数える。
+  // 帯の大きさを d で決めているので、写真の構図や切り出し枠に左右されない。
+  const BAND_W = 1.55, BAND_H = 0.85;
+  const x0 = Math.round(chin.x - BAND_W * d), x1 = Math.round(chin.x + BAND_W * d);
+  const y0 = Math.round(chin.y), y1 = Math.round(chin.y + BAND_H * d);
+  const bx0 = Math.max(0, x0), bx1 = Math.min(W, x1);
+  const by0 = Math.max(0, y0), by1 = Math.min(H, y1);
+  const bandArea = (x1 - x0) * (y1 - y0);
+  const availArea = Math.max(0, bx1 - bx0) * Math.max(0, by1 - by0);
+  const enoughBand = bandArea > 0 && availArea >= bandArea * 0.6;
+
   const near = (i, c, tol) => (Math.abs(px[i] - c.r) + Math.abs(px[i + 1] - c.g) + Math.abs(px[i + 2] - c.b)) < tol;
   let hairPx = 0, total = 0;
-  if (hair && plainBg) {
-    const y0 = Math.min(H - 1, chin.y), y1 = H;
-    for (let y = y0; y < y1; y++) {
-      for (let x = 0; x < W; x++) {
+  if (hair && plainBg && enoughBand) {
+    for (let y = by0; y < by1; y++) {
+      for (let x = bx0; x < bx1; x++) {
         const i = (y * W + x) * stride;
         total++;
         if (near(i, hair, 110) && !near(i, bg, 70) && !near(i, skin, 80)) hairPx++;
       }
     }
   }
+  const measurable = hair && plainBg && enoughBand && total > 0;
 
-  // 採取点が背景や肌と見分けられないとき（薄毛・髪を上げている等）は
-  // 髪の計測を「不能」として返す。正規化側で中央値扱いになる。
   return {
     skinTone: -lum(skin.r, skin.g, skin.b),                 // 高いほど小麦肌
     hairColor: hair ? lum(hair.r, hair.g, hair.b) : null,   // 高いほど明るい髪
-    hairLength: hair && plainBg ? (total ? hairPx / total : 0) : null, // 高いほどロング（無地背景のときだけ）
-    _skin: skin, _hair: hair, _bg: bg, _hairProbe: hairProbe, _plainBg: plainBg,
+    hairLength: measurable ? hairPx / total : null,         // 高いほどロング
+    _skin: skin, _hair: hair, _bg: bg, _hairProbe: hairProbe,
+    _band: { x0: bx0, y0: by0, x1: bx1, y1: by1 },
+    _plainBg: plainBg, _enoughBand: enoughBand,
   };
 }
-

@@ -3,7 +3,7 @@
 // 特徴量の計算は Node 版（tools/analyze.mjs）と同じ src/measure.js を使う。
 
 import * as faceapi from '../vendor/face-api.esm.js';
-import { measureGeometry, measurePixels } from './measure.js';
+import { measureGeometry, measurePixels, chooseBox } from './measure.js';
 
 const MODEL_URL = 'vendor/models';
 const WORK = 1024;   // 検出に使う作業解像度
@@ -45,7 +45,7 @@ async function toWorkCanvas(file) {
   const c = document.createElement('canvas');
   c.width = Math.round(bmp.width * k);
   c.height = Math.round(bmp.height * k);
-  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  c.getContext('2d', { willReadFrequently: true }).drawImage(bmp, 0, 0, c.width, c.height);
   bmp.close?.();
   return c;
 }
@@ -100,18 +100,19 @@ export async function analyzeFile(file, { multi = false, minScore = 0.45 } = {})
   if (!dets.length) return { faces: [], skipped: ['顔を検出できませんでした'] };
 
   const faces = [], skipped = [];
+  const wctx = work.getContext('2d', { willReadFrequently: true });
+  const full = wctx.getImageData(0, 0, work.width, work.height).data;
+
   for (const [k, det] of dets.entries()) {
     const geo = measureGeometry(det.landmarks.positions);
-    // 頭と肩が入る正方形。髪の長さを測るためあご下に余白を残す。
-    const box = Math.round(geo._d * 6.6);
-    const ox = Math.round(geo._eyeMid.x - box / 2);
-    const oy = Math.round(geo._eyeMid.y - box * 0.30);
-    const pad = Math.max(-ox, -oy, ox + box - work.width, oy + box - work.height, 0);
+    // 画素の計測は元画像に対して行う（髪の長さの判定域が切り出し枠の外に出ることがあるため）
+    const pix = measurePixels(full, work.width, work.height, geo, 4);
+
+    // 表示用の切り出し。画像に収まる範囲でできるだけ広く取る。
+    const { box, ox, oy, pad } = chooseBox(geo, work.width, work.height);
     if (pad > box * 0.25) { skipped.push('顔が画像の端に寄りすぎています'); continue; }
 
     const crop = cropSquare(work, ox, oy, box, OUT);
-    const px = crop.getContext('2d').getImageData(0, 0, OUT, OUT).data;
-    const pix = measurePixels(px, OUT, OUT, geo, OUT / box, ox, oy, 4);
 
     const raw = {};
     for (const [key, v] of Object.entries(geo)) if (!key.startsWith('_')) raw[key] = v;
