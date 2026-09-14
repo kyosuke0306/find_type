@@ -1,3 +1,6 @@
 node_modules/
 .cache/
 .DS_Store
+
+# 手元だけで使う顔プール（リポジトリに入れない）
+private/
