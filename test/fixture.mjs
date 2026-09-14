@@ -6,8 +6,9 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { KEYS } from '../src/features.js';
 
-const OUT = path.resolve('.cache/fixture');
+const OUT = path.resolve(process.env.FIXTURE_OUT ?? '.cache/fixture');
 const N = Number(process.argv[2] ?? 80);
+const ONLY = process.argv[3] ?? null;  // 'female' | 'male' で片方だけのプールを作る
 const mulberry = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const rand = mulberry(42);
 
@@ -15,7 +16,7 @@ await fs.mkdir(path.join(OUT, 'faces'), { recursive: true });
 const faces = [];
 for (let i = 0; i < N; i++) {
   const raw = Object.fromEntries(KEYS.map((k) => [k, rand()]));
-  const gender = i % 2 ? 'male' : 'female';
+  const gender = ONLY ?? (i % 2 ? 'male' : 'female');
   const file = `dummy${String(i).padStart(3, '0')}.jpg`;
   const hue = Math.round(rand() * 360);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320">

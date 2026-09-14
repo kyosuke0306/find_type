@@ -11,6 +11,7 @@ const show = (id) => {
 };
 
 const STORE_KEY = 'find-type/last-result';
+const MIN_FACES = 12;  // 1回の診断に必要な最小の顔数
 // ?data=... で別の顔プールに差し替えられる（動作確認用のダミープールなど）
 const DATA = (new URLSearchParams(location.search).get('data') ?? 'data').replace(/\/+$/, '');
 const faceSrc = (file) => `${DATA}/faces/${file}`;
@@ -37,7 +38,7 @@ async function init() {
     if (!res.ok) throw new Error(`${DATA}/faces.json を読み込めません (HTTP ${res.status})`);
     const json = await res.json();
     const faces = json.faces ?? [];
-    if (faces.length < 12) throw new Error(`顔画像が ${faces.length} 枚しかありません。12枚以上必要です。`);
+    if (faces.length < MIN_FACES) throw new Error(`顔画像が ${faces.length} 枚しかありません。${MIN_FACES}枚以上必要です。`);
     state.pool = normalizePool(faces);
   } catch (e) {
     $('setup-error').textContent = e.message;
@@ -51,11 +52,18 @@ async function init() {
 /* ---------------- スタート画面 ---------------- */
 function buildStartScreen() {
   const counts = state.pool.reduce((m, f) => (m[f.gender] = (m[f.gender] ?? 0) + 1, m), {});
+  const nFemale = counts.female ?? 0, nMale = counts.male ?? 0;
   const options = [
-    { value: 'female', label: '女性の顔', n: counts.female ?? 0 },
-    { value: 'male', label: '男性の顔', n: counts.male ?? 0 },
-    { value: 'all', label: '両方', n: state.pool.length },
-  ].filter((o) => o.n >= 12);
+    { value: 'female', label: '女性の顔', n: nFemale },
+    { value: 'male', label: '男性の顔', n: nMale },
+  ].filter((o) => o.n >= MIN_FACES);
+  // 「両方」は両方の性別が単独で足りているときだけ意味がある。
+  // 片方しかいないプールで出すと同じ選択肢が2つ並んでしまう。
+  if (nFemale >= MIN_FACES && nMale >= MIN_FACES) {
+    options.push({ value: 'all', label: '両方', n: state.pool.length });
+  } else if (!options.length && state.pool.length >= MIN_FACES) {
+    options.push({ value: 'all', label: 'すべての顔', n: state.pool.length });
+  }
 
   const box = $('gender-choices');
   box.innerHTML = '';
@@ -67,6 +75,9 @@ function buildStartScreen() {
     box.appendChild(b);
   });
   state.gender = options[0]?.value ?? 'all';
+  box.previousElementSibling.textContent = options.length > 1
+    ? '診断する顔'
+    : '診断する顔（今のプールにはこれだけあります）';
   bindChoices(box, (v) => { state.gender = v; updateRoundsHint(); });
   bindChoices($('rounds-choices'), (v) => { state.rounds = Number(v); updateRoundsHint(); });
   updateRoundsHint();
