@@ -1,0 +1,30 @@
+# Pages デプロイが即座に失敗する原因を切り分けるための一時的なワークフロー。
+# どのジョブが通り、どれが落ちるかで原因が特定できる。原因が分かったら削除する。
+name: Pages diagnosis
+
+on:
+  workflow_dispatch:
+
+jobs:
+  plain:
+    name: 1. 素のジョブ（Actions が動くか）
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "OK"
+
+  with-permissions:
+    name: 2. 権限を要求するジョブ
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - run: echo "OK"
+
+  with-environment:
+    name: 3. github-pages 環境を使うジョブ
+    runs-on: ubuntu-latest
+    environment: github-pages
+    steps:
+      - run: echo "OK"
