@@ -1,8 +1,17 @@
 // 好み推定モデルの検証。
 // 「本当の好み」を持つ仮想ユーザーに選択させ、その回答だけから好みを復元できるか測る。
-import { KEYS } from '../src/features.js';
+import fs from 'node:fs';
+import { KEYS, normalizePool } from '../src/features.js';
 import { fit, predict, choosePair, updateStats, newStats, utilityDelta } from '../src/model.js';
 const W = process.env.PW ? JSON.parse(process.env.PW) : undefined;
+
+// --pool data/faces.json を渡すと、合成プールではなく実際の顔で検証する。
+// 画像を追加したときに、そのプールで本当に精度が上がったかを見るため。
+const poolAt = process.argv.indexOf('--pool');
+const POOL_PATH = poolAt > 0 ? process.argv[poolAt + 1] : null;
+const REAL_POOL = POOL_PATH
+  ? normalizePool(JSON.parse(fs.readFileSync(POOL_PATH, 'utf8')).faces).map((f) => ({ id: f.file, v: f.v }))
+  : null;
 
 const mulberry = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const sigmoid = (z) => 1 / (1 + Math.exp(-z));
@@ -83,18 +92,19 @@ function evaluate(pool, user, model, rand) {
   return { acc: ok / n, hit, hit5, merr };
 }
 
-const ROUNDS = Number(process.argv[2] ?? 30);
-const TRIALS = Number(process.argv[3] ?? 60);
+const POS = process.argv.slice(2).filter((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--pool');
+const ROUNDS = Number(POS[0] ?? 30);
+const TRIALS = Number(POS[1] ?? 60);
 for (const adaptive of [false, true]) {
   const agg = { acc: 0, hit: 0, hit5: 0, merr: 0 };
   for (let t = 0; t < TRIALS; t++) {
     const rand = mulberry(1000 + t);
-    const pool = makePool(160, rand);
+    const pool = REAL_POOL ?? makePool(160, rand);
     const user = makeUser(rand);
     const model = runSession(pool, user, ROUNDS, rand, adaptive);
     const e = evaluate(pool, user, model, rand);
     for (const k in agg) agg[k] += e[k];
   }
   const f = (x) => (agg[x] / TRIALS).toFixed(3);
-  console.log(`${adaptive ? 'adaptive' : 'random  '} rounds=${ROUNDS}  予測一致率=${f('acc')}  重要特徴Top3的中=${f('hit')}  Top5内=${f('hit5')}  理想値誤差=${f('merr')}`);
+  console.log(`${adaptive ? 'adaptive' : 'random  '} ${REAL_POOL ? `実プール${REAL_POOL.length}枚 ` : ''}rounds=${ROUNDS}  予測一致率=${f('acc')}  重要特徴Top3的中=${f('hit')}  Top5内=${f('hit5')}  理想値誤差=${f('merr')}`);
 }

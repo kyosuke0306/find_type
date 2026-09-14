@@ -42,6 +42,18 @@ async function one(file, res) {
 
 const files = (await fs.readdir(dir)).filter(f=>/\.jpg$/.test(f)).sort().map(f=>path.join(dir,f));
 const RES = [900, 1024, 1150];
+
+// 解析は縮小しかしない（拡大はしない）ので、元画像が小さいとどの解像度でも同じ画像になり、
+// ノイズが 0 と出てしまう。それでは検証にならないので、元の写真を渡すよう促す。
+const sizes = await Promise.all(files.map(async (f) => (await sharp(f).metadata()).width ?? 0));
+const tooSmall = sizes.filter((w) => w < Math.min(...RES)).length;
+if (tooSmall === files.length) {
+  console.error(`画像が ${Math.min(...RES)}px 未満です。解像度を変えても同じ結果になるためノイズを測れません。`);
+  console.error('トリミング済みの data/faces ではなく、生成したままの元画像のフォルダを渡してください。');
+  process.exit(1);
+} else if (tooSmall) {
+  console.error(`※ ${tooSmall}/${files.length} 枚が ${Math.min(...RES)}px 未満で、ノイズを小さく見積もります。`);
+}
 const perFile = [];
 for (const f of files) {
   const runs = [];
