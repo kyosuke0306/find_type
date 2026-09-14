@@ -17,59 +17,21 @@
     <p class="lead" id="loading-text">読み込み中…</p>
   </section>
 
-  <!-- 顔の追加・管理 -->
-  <section id="screen-import" class="screen" hidden>
-    <h1 class="logo">顔を追加</h1>
-    <p class="lead" id="import-lead">スマホやPCに保存した顔写真を選ぶと、この端末の中だけで解析して取り込みます。</p>
-
-    <div class="card">
-      <label for="file-input" class="dropzone" id="dropzone">
-        <span class="dropzone-icon">＋</span>
-        <span class="dropzone-main">画像を選ぶ</span>
-        <span class="dropzone-sub">複数まとめて選べます</span>
-      </label>
-      <input id="file-input" type="file" accept="image/*" multiple hidden>
-
-      <label class="check">
-        <input type="checkbox" id="multi-check">
-        1枚に複数の人が写っている（全員取り込む）
-      </label>
-
-      <div class="field" style="margin:14px 0 0">
-        <label class="field-label" for="gender-select">取り込む顔の性別</label>
-        <select id="gender-select" class="select">
-          <option value="">自動で判定する</option>
-          <option value="female">すべて女性として扱う</option>
-          <option value="male">すべて男性として扱う</option>
-        </select>
-        <p class="hint">自動判定はショートヘアの女性を男性と誤ることがあります。性別が分かっている画像をまとめて取り込むときは指定してください。</p>
-      </div>
-
-      <div id="import-progress" hidden>
-        <div class="progress"><div class="progress-fill" id="import-fill"></div></div>
-        <p class="hint" id="import-status"></p>
-      </div>
-      <ul class="log" id="import-log"></ul>
-    </div>
-
-    <div class="card">
-      <h2 class="card-title">取り込み済み <span id="stored-count">0</span>枚</h2>
-      <p class="card-note" id="stored-breakdown"></p>
-      <div class="chosen-strip" id="stored-strip"></div>
-      <button id="btn-clear" class="btn btn-ghost btn-block" hidden>すべて削除</button>
-    </div>
-
+  <!-- 顔画像が足りないとき -->
+  <section id="screen-setup-needed" class="screen" hidden>
+    <h1 class="logo">顔の好み診断</h1>
     <div class="card note">
-      <h2>うまく測るためのコツ</h2>
-      <ul class="tips">
-        <li><b>正面を向いた写真</b>を選んでください。大きく傾いていると計測精度が落ちます。</li>
-        <li><b>背景が無地</b>だと「髪の長さ」まで測れます。雑多な背景ではこの項目だけ除外されます。</li>
-        <li>スクリーンショットではなく<b>画像そのもの</b>を保存したものを使ってください。</li>
-        <li>同じ人の写真は<b>1枚だけ</b>にしてください。同一人物が多いと結果が偏ります。</li>
-      </ul>
+      <h2>顔画像を用意してください</h2>
+      <p class="dim" id="setup-reason"></p>
+      <p>このアプリは <code>data/faces.json</code> と <code>data/faces/</code> の顔画像を使います。
+         次の手順で用意してください。</p>
+      <ol class="steps">
+        <li><code>npm install</code></li>
+        <li><code>npm run generate -- --dry-run --count 24 --female-ratio 1</code><br>
+            <span class="dim">書き出されたプロンプトで顔画像を生成し、1つのフォルダに保存します</span></li>
+        <li><code>npm run analyze -- --from &lt;画像フォルダ&gt; --gender female</code></li>
+      </ol>
     </div>
-
-    <button id="btn-to-start" class="btn btn-primary btn-block" disabled>診断をはじめる</button>
   </section>
 
   <!-- スタート画面 -->
@@ -93,7 +55,6 @@
       </div>
       <button id="btn-start" class="btn btn-primary btn-block">はじめる</button>
       <button id="btn-last-result" class="btn btn-ghost btn-block" hidden>前回の結果を見る</button>
-      <button id="btn-manage" class="btn btn-ghost btn-block">顔を追加・管理する</button>
     </div>
     <p class="footnote" id="pool-info"></p>
   </section>

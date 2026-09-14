@@ -2,8 +2,6 @@
 
 import { FEATURES, KEYS, normalizePool } from './features.js';
 import { fit, choosePair, updateStats, newStats, score, looAccuracy } from './model.js';
-import { analyzeFile, loadModels, backendName } from './import.js';
-import { putFaces, clearFaces, deleteFace, loadStoredPool } from './store.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => {
@@ -18,8 +16,7 @@ const MIN_FACES = 12;  // 1回の診断に必要な最小の顔数
 const DATA = (new URLSearchParams(location.search).get('data') ?? 'data').replace(/\/+$/, '');
 
 const state = {
-  pool: [],          // 同梱＋取り込み済みの全画像（正規化済み）
-  stored: [],        // この端末に取り込んだ分
+  pool: [],          // 顔プール（正規化済み）
   byId: new Map(),
   faces: [],         // 今回使う性別に絞ったもの
   gender: 'female',
@@ -37,38 +34,34 @@ init();
 
 async function init() {
   $('loading-text').textContent = '顔を読み込み中…';
-  await reloadPool();
+  try {
+    await reloadPool();
+  } catch (e) {
+    return showSetupNeeded(e.message);
+  }
   if (state.pool.length < MIN_FACES) {
-    showImport(state.pool.length === 0
-      ? 'まずは顔写真を取り込みます。スマホやPCに保存した画像を選ぶだけで、この端末の中だけで解析します。'
-      : `あと ${MIN_FACES - state.pool.length} 枚で診断をはじめられます。`);
-    return;
+    return showSetupNeeded(`顔画像が ${state.pool.length} 枚しかありません。${MIN_FACES}枚以上必要です。`);
   }
   buildStartScreen();
   show('screen-start');
 }
 
-/**
- * 顔プールを読み直す。
- * リポジトリに同梱された data/faces.json と、この端末に取り込んだ分の両方を使う。
- * 正規化（プール内での相対値への変換）は合わせてから行う。
- */
+function showSetupNeeded(reason) {
+  $('setup-reason').textContent = reason;
+  show('screen-setup-needed');
+}
+
+/** 顔プールを読み込んで、プール内での相対値に正規化する */
 async function reloadPool() {
-  const bundled = await loadBundled();
-  state.stored = await loadStoredPool();
-  state.pool = normalizePool([...bundled, ...state.stored]);
+  state.pool = normalizePool(await loadBundled());
   state.byId = new Map(state.pool.map((f) => [f.id, f]));
 }
 
 async function loadBundled() {
-  try {
-    const res = await fetch(`${DATA}/faces.json`, { cache: 'no-cache' });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return (json.faces ?? []).map((f) => ({ ...f, src: `${DATA}/faces/${f.file}` }));
-  } catch {
-    return [];   // 同梱プールが無くても、取り込んだ分だけで動く
-  }
+  const res = await fetch(`${DATA}/faces.json`, { cache: 'no-cache' });
+  if (!res.ok) throw new Error(`${DATA}/faces.json を読み込めません (HTTP ${res.status})`);
+  const json = await res.json();
+  return (json.faces ?? []).map((f) => ({ ...f, src: `${DATA}/faces/${f.file}` }));
 }
 
 /* ---------------- スタート画面 ---------------- */
@@ -340,116 +333,6 @@ async function copyResult(r) {
   }
   setTimeout(() => { $('btn-copy').textContent = '結果をコピー'; }, 1800);
 }
-
-/* ---------------- 顔の追加・管理 ---------------- */
-function showImport(lead) {
-  if (lead) $('import-lead').textContent = lead;
-  renderStored();
-  show('screen-import');
-}
-
-function renderStored() {
-  const n = state.stored.length;
-  $('stored-count').textContent = n;
-  const counts = state.stored.reduce((m, f) => (m[f.gender] = (m[f.gender] ?? 0) + 1, m), {});
-  const parts = [];
-  if (counts.female) parts.push(`女性 ${counts.female}枚`);
-  if (counts.male) parts.push(`男性 ${counts.male}枚`);
-  const bundled = state.pool.length - n;
-  if (bundled > 0) parts.push(`同梱分 ${bundled}枚`);
-  $('stored-breakdown').textContent = n
-    ? `${parts.join(' / ')}　（診断には片方の性別で${MIN_FACES}枚以上が必要です）`
-    : 'まだ取り込んだ顔はありません。';
-
-  $('stored-strip').innerHTML = state.stored.map((f) => `
-    <div class="stored-item"><img src="${f.src}" alt="" loading="lazy">
-    <button data-del="${f.id}" aria-label="削除">×</button></div>`).join('');
-  $('btn-clear').hidden = n === 0;
-
-  const enough = ['female', 'male'].some((g) => state.pool.filter((f) => f.gender === g).length >= MIN_FACES)
-    || state.pool.length >= MIN_FACES;
-  $('btn-to-start').disabled = !enough;
-  $('btn-to-start').textContent = enough
-    ? '診断をはじめる'
-    : `あと ${Math.max(1, MIN_FACES - state.pool.length)} 枚で診断できます`;
-}
-
-async function handleFiles(fileList) {
-  const files = [...fileList].filter((f) => /^image\//.test(f.type) || /\.(jpe?g|png|webp|heic|heif)$/i.test(f.name));
-  if (!files.length) return;
-
-  const multi = $('multi-check').checked;
-  const gender = $('gender-select').value || null;
-  const log = $('import-log');
-  $('import-progress').hidden = false;
-  $('import-status').textContent = 'モデルを読み込み中…（初回のみ約2MB）';
-  $('import-fill').style.width = '0%';
-  log.innerHTML = '';
-
-  try {
-    await loadModels((step) => { $('import-status').textContent = step; });
-  } catch (e) {
-    $('import-status').textContent = `モデルを読み込めませんでした: ${e.message}`;
-    return;
-  }
-
-  const slow = backendName() !== 'webgl';
-  let added = 0;
-  for (const [i, file] of files.entries()) {
-    $('import-status').textContent = `${i + 1} / ${files.length} 枚目を解析中…`
-      + (slow ? '（この端末ではGPUが使えないため時間がかかります）' : '');
-    $('import-fill').style.width = `${(i / files.length) * 100}%`;
-    // 画面を更新させてから重い処理に入る
-    await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
-    try {
-      const { faces, skipped } = await analyzeFile(file, { multi, gender });
-      if (faces.length) {
-        await putFaces(faces);
-        added += faces.length;
-      }
-      const li = document.createElement('li');
-      li.className = faces.length ? 'ok' : 'ng';
-      li.textContent = faces.length
-        ? `${file.name}: ${faces.length}人を取り込みました`
-        : `${file.name}: ${skipped[0] ?? '取り込めませんでした'}`;
-      log.appendChild(li);
-    } catch (e) {
-      const li = document.createElement('li');
-      li.className = 'ng';
-      li.textContent = `${file.name}: ${e.message}`;
-      log.appendChild(li);
-    }
-    log.scrollTop = log.scrollHeight;
-  }
-
-  $('import-fill').style.width = '100%';
-  $('import-status').textContent = `${added}人を取り込みました。`;
-  await reloadPool();
-  renderStored();
-}
-
-$('file-input').addEventListener('change', (e) => { handleFiles(e.target.files); e.target.value = ''; });
-$('btn-manage')?.addEventListener('click', () => showImport());
-$('btn-to-start').addEventListener('click', () => { buildStartScreen(); show('screen-start'); });
-$('btn-clear').addEventListener('click', async () => {
-  if (!confirm(`取り込んだ ${state.stored.length} 枚をすべて削除します。よろしいですか？`)) return;
-  await clearFaces();
-  await reloadPool();
-  renderStored();
-});
-$('stored-strip').addEventListener('click', async (e) => {
-  const id = e.target.closest('button')?.dataset.del;
-  if (!id) return;
-  await deleteFace(id);
-  await reloadPool();
-  renderStored();
-});
-
-// ドラッグ＆ドロップ（PC向け）
-const dz = $('dropzone');
-['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('is-over'); }));
-['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('is-over'); }));
-dz.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
 
 /* ---------------- 入力 ---------------- */
 document.querySelectorAll('.face-card').forEach((card) => {
