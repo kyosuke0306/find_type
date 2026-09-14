@@ -21,7 +21,11 @@ http.createServer((req, res) => {
   // ルート外へのアクセスを防ぐ
   if (!file.startsWith(ROOT)) { res.writeHead(403).end('Forbidden'); return; }
   fs.readFile(file, (err, buf) => {
-    if (err) { res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end('見つかりません: ' + rel); return; }
+    if (err) {
+      console.log(`404 ${rel}`);
+      res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' }).end('見つかりません: ' + rel);
+      return;
+    }
     res.writeHead(200, { 'content-type': TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream' });
     res.end(buf);
   });

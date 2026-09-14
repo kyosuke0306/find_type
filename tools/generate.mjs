@@ -26,9 +26,17 @@ const AXES = {
 };
 
 const ETHNICITY = {
+  japanese: ['Japanese'],
   eastasian: ['Japanese', 'Korean', 'Chinese'],
   mixed: ['Japanese', 'Korean', 'Chinese', 'Japanese', 'Southeast Asian', 'White European', 'Black', 'Latin American', 'Middle Eastern', 'mixed-race'],
   global: ['White European', 'Black', 'Latin American', 'South Asian', 'Middle Eastern', 'East Asian', 'Southeast Asian'],
+};
+
+// 日本人・東アジア系に限定するときは、肌と髪の選択肢を現実的な範囲に差し替える。
+// 「deep brown skin の日本人」のような矛盾した指定を避けるため。
+const EAST_ASIAN_AXES = {
+  skin: ['very fair porcelain skin', 'fair skin', 'light skin with warm undertone', 'medium skin tone', 'lightly tanned skin'],
+  hairColor: ['jet black hair', 'dark brown hair', 'dyed light brown hair', 'dyed ash brown hair', 'dyed bleached blonde hair'],
 };
 
 // 全カット共通の構図指定。ここがぶれると肌色・髪の長さの実測が狂う。
@@ -43,7 +51,7 @@ const FRAMING = [
 ].join(', ');
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'mixed', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -80,13 +88,14 @@ function makeBag(list, rand) {
 /** 属性グリッドからプロンプトを作る。各軸が均等に現れるようにして特徴空間を広くカバーする。 */
 function buildPrompts(n, opts) {
   const rand = mulberry(opts.seed);
-  const eth = ETHNICITY[opts.ethnicity] ?? ETHNICITY.mixed;
-  const bags = Object.fromEntries(Object.entries(AXES).map(([k, v]) => [k, makeBag(v, rand)]));
+  const eth = ETHNICITY[opts.ethnicity] ?? ETHNICITY.japanese;
+  const axes = ['japanese', 'eastasian'].includes(opts.ethnicity) ? { ...AXES, ...EAST_ASIAN_AXES } : AXES;
+  const bags = Object.fromEntries(Object.entries(axes).map(([k, v]) => [k, makeBag(v, rand)]));
   const ethBag = makeBag(eth, rand);
   const out = [];
   for (let i = 0; i < n; i++) {
     const gender = i < Math.round(n * opts.femaleRatio) ? 'woman' : 'man';
-    const pick = Object.fromEntries(Object.keys(AXES).map((k) => [k, bags[k]()]));
+    const pick = Object.fromEntries(Object.keys(axes).map((k) => [k, bags[k]()]));
     const who = ethBag();
     const hair = gender === 'man' && /past the chest|shoulder-length/.test(pick.hair)
       ? (rand() < 0.7 ? 'short hair above the ears' : pick.hair) : pick.hair;
