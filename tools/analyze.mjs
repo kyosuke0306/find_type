@@ -158,7 +158,14 @@ async function extractFace(det, ctx) {
       ? region.extend({ ...ext, background: { r: Math.round(pix._bg.r), g: Math.round(pix._bg.g), b: Math.round(pix._bg.b) } })
       : region.extend({ ...ext, extendWith: 'copy' });
   }
-  const cropPng = await region.resize(args.size, args.size, { fit: 'fill' }).png().toBuffer();
+  // sharp は extend を resize のあとに適用するため、同じ流れに resize をつなぐと
+  // 埋めた分だけ縦横が伸びて正方形でなくなる。工程を分けて確実に box × box にする。
+  const boxPng = await region.png().toBuffer();
+  const boxMeta = await sharp(boxPng).metadata();
+  if (boxMeta.width !== box || boxMeta.height !== box) {
+    throw new Error(`切り出しが ${boxMeta.width}x${boxMeta.height} になりました (期待 ${box}x${box})`);
+  }
+  const cropPng = await sharp(boxPng).resize(args.size, args.size, { fit: 'fill' }).png().toBuffer();
 
   const outName = `${id}.jpg`;
   await sharp(cropPng).jpeg({ quality: 82, mozjpeg: true }).toFile(path.join(outDir, outName));

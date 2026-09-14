@@ -25,6 +25,7 @@ const state = {
   round: 0,          // 答えた回数（スキップは数えない）
   shown: 0,          // 出したペアの数（無限に続かないようにするため）
   pair: null,
+  next: null,        // 先に決めて読み込んでおいた次のペア
   history: [],       // { a, b, winner, skipped }
   stats: newStats(),
   model: null,
@@ -130,63 +131,97 @@ function startSession() {
   state.history = [];
   state.stats = newStats();
   state.model = null;
+  state.next = null;
   show('screen-play');
   nextRound();
 }
 
-function nextRound() {
-  if (state.round >= state.rounds) return finishSession();
-  // スキップが続いても終わらなくならないように上限を設ける
-  if (state.shown >= state.rounds * 3) return finishSession();
-  state.shown++;
-  // 序盤はモデルが当てにならないので、推定を使い始めるのは数回たってから
+// 選んだあとの演出の長さ。この間に次の顔を読み込む。
+const PICK_MS = 420;
+
+// 次に出すペアを決める。序盤はモデルが当てにならないので、
+// 推定を使い始めるのは数回たってから。
+function decidePair() {
   const model = state.history.length >= 6 ? state.model : null;
-  state.pair = choosePair(state.faces, model, state.stats);
-  renderPair();
+  return choosePair(state.faces, model, state.stats);
 }
 
-function renderPair() {
+// 画像が実際に表示できる状態になるまで待つ。読み込み済みならすぐ返る。
+function loadFace(f) {
+  const img = new Image();
+  img.src = f.src;
+  if (img.decode) return img.decode().catch(() => {});
+  return img.complete ? Promise.resolve() : new Promise((done) => { img.onload = img.onerror = done; });
+}
+
+// 次のペアを決めて先に読み込んでおく。残り回数が尽きていれば決めない。
+function prepareNext() {
+  // スキップが続いても終わらなくならないように上限を設ける
+  if (state.round >= state.rounds || state.shown >= state.rounds * 3) {
+    state.next = null;
+    return Promise.resolve();
+  }
+  state.next = decidePair();
+  return Promise.all(state.next.map(loadFace));
+}
+
+function nextRound() {
+  if (!state.next) prepareNext();
+  if (!state.next) return finishSession();
+  state.shown++;
+  state.pair = state.next;
+  state.next = null;
+  return showPair();
+}
+
+async function showPair() {
   const [a, b] = state.pair;
-  $('img-0').src = a.src;
-  $('img-1').src = b.src;
-  document.querySelectorAll('.face-card').forEach((c) => {
-    c.classList.remove('is-picked', 'is-dropped');
-    // 入場アニメーションをやり直させる
-    c.style.animation = 'none'; void c.offsetWidth; c.style.animation = '';
-  });
+  const arena = $('arena');
+  // 読み込みが終わるまで古い顔を残さない。残したままだと、
+  // 切り替わる前の顔を見て選んでしまう。
+  // 先読みが効いていればこの状態は1フレームも表示されない。
+  arena.classList.add('is-loading');
+  state.busy = true;
+  const cards = document.querySelectorAll('.face-card');
+  // 選んだあとの見た目を読み込み中まで引きずらないよう、先に戻す
+  cards.forEach((c) => c.classList.remove('is-picked', 'is-dropped'));
   $('round-label').textContent = `${state.round + 1} / ${state.rounds}`;
   $('progress-fill').style.width = `${(state.round / state.rounds) * 100}%`;
   $('btn-undo').disabled = state.history.length === 0;
-  preloadNext();
-}
 
-// 次に出そうな顔を先に読み込んでおき、切り替わりのちらつきを防ぐ
-function preloadNext() {
-  const model = state.history.length >= 6 ? state.model : null;
-  try {
-    const [a, b] = choosePair(state.faces, model, state.stats);
-    [a, b].forEach((f) => { new Image().src = f.src; });
-  } catch { /* プールが小さいときは何もしない */ }
+  const img0 = $('img-0'), img1 = $('img-1');
+  img0.src = a.src;
+  img1.src = b.src;
+  await Promise.all([img0, img1].map((im) => (im.decode ? im.decode().catch(() => {}) : Promise.resolve())));
+
+  // 入場アニメーションをやり直させる
+  cards.forEach((c) => { c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; });
+  arena.classList.remove('is-loading');
+  state.busy = false;
 }
 
 function choose(side) {
   if (state.busy || !state.pair) return;
   const [a, b] = state.pair;
-  const win = side === 0 ? a : b, lose = side === 0 ? b : a;
+  const win = side === 0 ? a : b;
   const cards = document.querySelectorAll('.face-card');
   cards[side].classList.add('is-picked');
   cards[1 - side].classList.add('is-dropped');
   state.busy = true;
 
-  setTimeout(() => {
-    state.history.push({ a, b, winner: win.id, skipped: false });
-    updateStats(state.stats, a, b);
-    state.round++;
-    // 選択が増えるたび再推定し、次のペア選びに反映する
-    if (state.history.length >= 6) state.model = fit(comparisons());
+  state.history.push({ a, b, winner: win.id, skipped: false });
+  updateStats(state.stats, a, b);
+  state.round++;
+  // 選択が増えるたび再推定し、次のペア選びに反映する
+  if (state.history.length >= 6) state.model = fit(comparisons());
+
+  // 演出を見せている間に次の顔を読み込む。両方そろってから切り替える。
+  const warm = prepareNext();
+  const anim = new Promise((done) => setTimeout(done, PICK_MS));
+  Promise.all([anim, warm]).then(() => {
     state.busy = false;
     nextRound();
-  }, 420);
+  });
 }
 
 function skip() {
@@ -201,6 +236,7 @@ function skip() {
 }
 
 function undo() {
+  if (state.busy) return;
   const last = state.history.pop();
   if (!last) return;
   if (!last.skipped) state.round = Math.max(0, state.round - 1);
@@ -212,8 +248,9 @@ function undo() {
     else updateStats(state.stats, h.a, h.b);
   }
   state.model = state.history.filter((h) => !h.skipped).length >= 6 ? fit(comparisons()) : null;
+  state.next = null;
   state.pair = [last.a, last.b];
-  renderPair();
+  showPair();
 }
 
 const comparisons = () => state.history.filter((h) => !h.skipped).map((h) => {
