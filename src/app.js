@@ -22,7 +22,8 @@ const state = {
   faces: [],         // 今回使う性別に絞ったもの
   gender: 'female',
   rounds: 30,
-  round: 0,
+  round: 0,          // 答えた回数（スキップは数えない）
+  shown: 0,          // 出したペアの数（無限に続かないようにするため）
   pair: null,
   history: [],       // { a, b, winner, skipped }
   stats: newStats(),
@@ -125,6 +126,7 @@ function bindChoices(box, onPick) {
 function startSession() {
   state.faces = state.gender === 'all' ? state.pool : state.pool.filter((f) => f.gender === state.gender);
   state.round = 0;
+  state.shown = 0;
   state.history = [];
   state.stats = newStats();
   state.model = null;
@@ -134,6 +136,9 @@ function startSession() {
 
 function nextRound() {
   if (state.round >= state.rounds) return finishSession();
+  // スキップが続いても終わらなくならないように上限を設ける
+  if (state.shown >= state.rounds * 3) return finishSession();
+  state.shown++;
   // 序盤はモデルが当てにならないので、推定を使い始めるのは数回たってから
   const model = state.history.length >= 6 ? state.model : null;
   state.pair = choosePair(state.faces, model, state.stats);
@@ -187,17 +192,19 @@ function choose(side) {
 function skip() {
   if (state.busy || !state.pair) return;
   const [a, b] = state.pair;
-  // スキップは好みの情報にならないので記録しない。ただし同じ組は再提示しない。
+  // スキップは好みの情報にならないので記録せず、回数にも数えない。
+  // 数えてしまうと、画面に出している精度（答えた回数に対する値）より
+  // 実際の精度が低くなってしまう。同じ組は再提示しない。
   state.stats.usedPairs.add(a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`);
   state.history.push({ a, b, winner: null, skipped: true });
-  state.round++;
   nextRound();
 }
 
 function undo() {
   const last = state.history.pop();
   if (!last) return;
-  state.round = Math.max(0, state.round - 1);
+  if (!last.skipped) state.round = Math.max(0, state.round - 1);
+  state.shown = Math.max(0, state.shown - 1);
   // 統計は作り直す（戻した分を確実に消すため）
   state.stats = newStats();
   for (const h of state.history) {
