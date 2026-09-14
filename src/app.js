@@ -69,24 +69,26 @@ function buildStartScreen() {
   const counts = state.pool.reduce((m, f) => (m[f.gender] = (m[f.gender] ?? 0) + 1, m), {});
   const nFemale = counts.female ?? 0, nMale = counts.male ?? 0;
   const options = [
-    { value: 'female', label: '女性', ic: 'female', n: nFemale },
-    { value: 'male', label: '男性', ic: 'male', n: nMale },
-  ].filter((o) => o.n >= MIN_FACES);
+    { value: 'female', label: '女性', ic: 'female' },
+    { value: 'male', label: '男性', ic: 'male' },
+  ].filter((o) => (o.value === 'female' ? nFemale : nMale) >= MIN_FACES);
   // 「両方」は両方の性別が単独で足りているときだけ意味がある
   if (nFemale >= MIN_FACES && nMale >= MIN_FACES) {
-    options.push({ value: 'all', label: '両方', ic: 'both', n: state.pool.length });
-  } else if (!options.length && state.pool.length >= MIN_FACES) {
-    options.push({ value: 'all', label: 'すべて', ic: 'both', n: state.pool.length });
+    options.push({ value: 'all', label: '両方', ic: 'both' });
+  } else if (!options.length) {
+    options.push({ value: 'all', label: 'すべて', ic: 'both' });
   }
+  state.gender = options[0].value;
 
-  $('gender-choices').className = `choices${options.length === 1 ? ' is-single' : ''}`;
-  $('gender-choices').innerHTML = options.map((o, i) =>
+  // 選べる性別が1つしかないなら、選択肢を出す意味がないので隠す
+  const genderBox = $('gender-choices');
+  genderBox.hidden = options.length < 2;
+  genderBox.innerHTML = options.length < 2 ? '' : options.map((o, i) =>
     `<button class="choice${i === 0 ? ' is-on' : ''}" data-value="${o.value}">
-       ${icon(o.ic)}<span>${o.label}</span><span class="sub">${o.n}枚</span>
+       ${icon(o.ic)}<span>${o.label}</span>
      </button>`).join('');
-  state.gender = options[0]?.value ?? 'all';
+  if (options.length >= 2) bindChoices(genderBox, (v) => { state.gender = v; });
 
-  // 精度は test/simulate.mjs の測定値（仮想ユーザーの好みを未知のペアで当てられた割合）
   $('rounds-choices').innerHTML = [
     { v: 20, label: 'さくっと', acc: 78 },
     { v: 30, label: 'おすすめ', acc: 83 },
@@ -95,7 +97,6 @@ function buildStartScreen() {
       <span class="big">${r.v}</span><span class="sub">${r.label}</span>
       <span class="acc">精度 ${r.acc}%</span></button>`).join('');
 
-  bindChoices($('gender-choices'), (v) => { state.gender = v; });
   bindChoices($('rounds-choices'), (v) => { state.rounds = Number(v); });
 
   $('btn-start').innerHTML = `${icon('play')}<span>はじめる</span>`;

@@ -123,8 +123,6 @@ code {
 
 /* ---------- 選択チップ ---------- */
 .choices { display: flex; gap: 8px; margin-bottom: 12px; }
-.choices.is-single { justify-content: center; }
-.choices.is-single .choice { flex: 0 0 auto; min-width: 118px; }
 .hint { font-size: .72rem; color: var(--ink-dim); text-align: center; margin: -4px 0 12px; }
 .choice {
   flex: 1 1 0; min-width: 0; padding: 12px 6px;
