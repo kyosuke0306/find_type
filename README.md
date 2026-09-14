@@ -122,6 +122,21 @@ APIキーは [Google AI Studio](https://aistudio.google.com/apikey) で取得で
 生成は途中で止めても、再実行すれば既存ファイルを飛ばして続きから進みます。
 レート制限は自動で待って再試行します。
 
+#### A-2. AI Studio の画面で手作業で生成する（無料）
+
+API を使わず、AI Studio の画面上で生成する場合はプロンプト一覧を書き出せます。
+
+```bash
+npm run generate -- --dry-run --count 24 --female-ratio 1 --out .cache/raw
+# → .cache/raw/prompts.txt に24件分のプロンプトが書き出される
+```
+
+`--female-ratio 1` で女性のみ、`0` で男性のみになります。
+アプリは片方の性別だけで12枚以上必要なので、**まずは診断したい側の性別だけ**を集めるのが確実です。
+
+生成した画像を `.cache/raw/` に保存したら、通常どおり解析してください。
+1枚の画像に複数人を生成させた場合は `--multi` を付けると全員を個別に取り込めます。
+
 #### B. 他のツールで作った画像を使う
 
 ComfyUI / Stable Diffusion / DALL·E など、**どのツールの出力でも構いません**。
@@ -150,6 +165,7 @@ npm run analyze -- --from .cache/raw
 | `--size` | 480 | 書き出す画像の一辺 |
 | `--append` | – | 既存の `faces.json` に追加する |
 | `--limit` | 制限なし | 先頭 N 枚だけ処理する |
+| `--multi` | – | 1枚の画像に写っている顔を全員取り込む（既定は最も確からしい1人だけ） |
 | `--debug` | – | 検出したランドマークと肌/髪の採取位置を重ねた確認用画像を出力する |
 
 計測が意図どおりか疑わしいときは `--debug .cache/debug` を付けて、
@@ -190,7 +206,7 @@ styles.css          スタイル
 src/features.js     15項目の定義と、プール内順位への正規化
 src/model.js        理想点モデルの推定・出題ペアの選択
 src/app.js          画面遷移と診断の進行
-tools/generate.mjs  Gemini / Imagen での顔生成
+tools/generate.mjs  Gemini / Imagen での顔生成、手作業用プロンプトの書き出し
 tools/analyze.mjs   顔検出・特徴量の実測・切り出し
 tools/serve.mjs     依存ゼロの静的サーバー
 test/simulate.mjs   仮想ユーザーによる推定精度の検証

@@ -163,8 +163,31 @@ async function main() {
 
   const prompts = buildPrompts(args.count, args);
   if (args.dryRun) {
-    prompts.slice(0, 8).forEach((p) => console.log(`[${p.index}] ${p.text}\n`));
-    console.log(`... 全 ${prompts.length} 件（--dry-run のため生成はしていません）`);
+    // API を使わず手で生成する場合に備え、全プロンプトをファイルに書き出す
+    const outDir = path.resolve(args.out);
+    await fs.mkdir(outDir, { recursive: true });
+    const listPath = path.join(outDir, 'prompts.txt');
+    const header = [
+      `# 顔の好み診断 用プロンプト（${prompts.length}件）`,
+      '#',
+      '# AI Studio (https://aistudio.google.com) の画像生成モデルに1件ずつ貼り付け、',
+      `# 生成された画像を ${args.out}/ に保存してください（ファイル名は自由）。`,
+      '#',
+      '# 生成された画像を見るときの確認点:',
+      '#   - 正面を向いているか（大きく傾いていると計測精度が落ちます）',
+      '#   - 背景が無地か（雑多だと「髪の長さ」が計測できません）',
+      '#   - 眉が前髪で隠れていないか',
+      '# 条件から外れたものは保存しなくて構いません。足りない分は後から追加できます。',
+      '#',
+      `# 全部そろったら:  npm run analyze -- --from ${args.out} --debug .cache/debug`,
+      '',
+    ].join('\n');
+    const body = prompts.map((p) =>
+      `--- ${p.index + 1} / ${prompts.length}  (${p.gender})\n${p.text}\n`).join('\n');
+    await fs.writeFile(listPath, header + body);
+
+    prompts.slice(0, 3).forEach((p) => console.log(`[${p.index + 1}] ${p.text}\n`));
+    console.log(`全 ${prompts.length} 件を ${path.relative(process.cwd(), listPath)} に書き出しました（--dry-run のため生成はしていません）`);
     return;
   }
   if (!key) { console.error('GEMINI_API_KEY を設定してください（https://aistudio.google.com/apikey）'); process.exit(1); }

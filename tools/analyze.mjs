@@ -19,7 +19,7 @@ import * as faceapi from '@vladmandic/face-api/dist/face-api.node-wasm.js';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function parseArgs(argv) {
-  const a = { from: null, out: 'data/faces', json: 'data/faces.json', size: 480, minScore: 0.45, append: false, limit: Infinity, debug: null };
+  const a = { from: null, out: 'data/faces', json: 'data/faces.json', size: 480, minScore: 0.45, append: false, limit: Infinity, debug: null, multi: false };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--from') a.from = argv[++i];
@@ -29,10 +29,11 @@ function parseArgs(argv) {
     else if (k === '--min-score') a.minScore = Number(argv[++i]);
     else if (k === '--limit') a.limit = Number(argv[++i]);
     else if (k === '--append') a.append = true;
+    else if (k === '--multi') a.multi = true;
     else if (k === '--debug') a.debug = argv[++i] ?? '.cache/debug';
   }
   if (!a.from) {
-    console.error('使い方: node tools/analyze.mjs --from <画像フォルダ> [--out data/faces] [--size 480] [--append] [--debug .cache/debug]');
+    console.error('使い方: node tools/analyze.mjs --from <画像フォルダ> [--out data/faces] [--size 480] [--append] [--multi] [--debug .cache/debug]');
     process.exit(1);
   }
   return a;
@@ -264,6 +265,65 @@ function debugOverlay(size, P0, geo, raw, ox, oy, scale, hairProbe) {
   </svg>`);
 }
 
+/**
+ * 検出した顔1つ分を、切り出し・特徴量の実測・書き出しまで行う。
+ * 1枚の画像に複数の顔がある場合はこれを顔の数だけ呼ぶ。
+ */
+async function extractFace(det, ctx) {
+  const { workPng, W0, H0, id, source, args, outDir, debugDir } = ctx;
+  const geo = measureGeometry(det.landmarks.positions);
+  const d = geo._d;
+
+  // 頭と肩が入る正方形で切り出す。
+  // 髪の長さは「あごより下に髪がどれだけ広がっているか」で測るので、
+  // あご下に十分な余白（切り出しの約35%）が残る大きさにする。
+  const box = Math.round(d * 6.6);
+  const ox = Math.round(geo._eyeMid.x - box / 2);
+  const oy = Math.round(geo._eyeMid.y - box * 0.30);
+
+  // 画像からはみ出す分は縁を引き伸ばして埋め、切り出し結果を必ず box × box にする。
+  // こうしないと縦横比が変わり、ランドマークと画素の対応がずれる。
+  const padL = Math.max(0, -ox), padT = Math.max(0, -oy);
+  const padR = Math.max(0, ox + box - W0), padB = Math.max(0, oy + box - H0);
+  if (Math.max(padL, padT, padR, padB) > box * 0.25) return { reason: '顔が画像の端に寄りすぎ' };
+
+  const exLeft = ox + padL, exTop = oy + padT;
+  const exW = box - padL - padR, exH = box - padT - padB;
+
+  let region = sharp(workPng).extract({ left: exLeft, top: exTop, width: exW, height: exH });
+  if (padL || padT || padR || padB) {
+    region = region.extend({ left: padL, top: padT, right: padR, bottom: padB, extendWith: 'copy' });
+  }
+  const cropPng = await region.resize(args.size, args.size, { fit: 'fill' }).png().toBuffer();
+
+  const outName = `${id}.jpg`;
+  await sharp(cropPng).jpeg({ quality: 82, mozjpeg: true }).toFile(path.join(outDir, outName));
+  const cropRaw = await sharp(cropPng).raw().toBuffer({ resolveWithObject: true });
+  const scale = args.size / box;
+  const pix = measurePixels(cropRaw.data, cropRaw.info.width, cropRaw.info.height, geo, scale, ox, oy);
+
+  const raw = {};
+  for (const [k, v] of Object.entries(geo)) if (!k.startsWith('_')) raw[k] = v;
+  for (const [k, v] of Object.entries(pix)) if (!k.startsWith('_')) raw[k] = v;
+  raw.ageLook = det.age;
+
+  if (debugDir) {
+    await sharp(cropPng)
+      .composite([{ input: debugOverlay(args.size, det.landmarks.positions, geo, raw, ox, oy, scale, pix._hairProbe), top: 0, left: 0 }])
+      .jpeg({ quality: 88 }).toFile(path.join(debugDir, outName));
+  }
+
+  return {
+    face: {
+      id, file: outName, source,
+      gender: det.gender, genderProbability: Number(det.genderProbability.toFixed(3)),
+      age: Number(det.age.toFixed(1)),
+      detScore: Number(det.detection.score.toFixed(3)),
+      raw: Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Number.isFinite(v) ? Number(v.toFixed(5)) : null])),
+    },
+  };
+}
+
 /* ---------- メイン ---------- */
 async function main() {
   const args = parseArgs(process.argv.slice(2));
@@ -299,68 +359,27 @@ async function main() {
       // 検出も切り出しも同じ1枚から行う。sharp はチェーン内の2回目の resize を無視するため、
       // 「リサイズ済みの画像を作る」→「そこから切り出す」の2段階に分ける。
       const workPng = await sharp(buf).removeAlpha()
-        .resize({ width: 720, height: 720, fit: 'inside', withoutEnlargement: true })
+        .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
         .png().toBuffer();
       const work = await sharp(workPng).raw().toBuffer({ resolveWithObject: true });
       const { width: W0, height: H0 } = work.info;
 
       const t = tf.tensor3d(new Uint8Array(work.data), [H0, W0, 3]);
-      const det = await faceapi.detectSingleFace(t, detOpts).withFaceLandmarks().withAgeAndGender();
+      const dets = args.multi
+        ? await faceapi.detectAllFaces(t, detOpts).withFaceLandmarks().withAgeAndGender()
+        : [await faceapi.detectSingleFace(t, detOpts).withFaceLandmarks().withAgeAndGender()].filter(Boolean);
       t.dispose();
-      if (!det) { skipped++; console.log(`  [skip] 顔を検出できません: ${file}`); continue; }
+      if (!dets.length) { skipped++; console.log(`  [skip] 顔を検出できません: ${file}`); continue; }
 
-      const geo = measureGeometry(det.landmarks.positions);
-      const d = geo._d;
-
-      // 頭と肩が入る正方形で切り出す。
-      // 髪の長さは「あごより下に髪がどれだけ広がっているか」で測るので、
-      // あご下に十分な余白（切り出しの約35%）が残る大きさにする。
-      const box = Math.round(d * 6.6);
-      const ox = Math.round(geo._eyeMid.x - box / 2);
-      const oy = Math.round(geo._eyeMid.y - box * 0.30);
-
-      // 画像からはみ出す分は縁を引き伸ばして埋め、切り出し結果を必ず box × box にする。
-      // こうしないと縦横比が変わり、ランドマークと画素の対応がずれる。
-      const padL = Math.max(0, -ox), padT = Math.max(0, -oy);
-      const padR = Math.max(0, ox + box - W0), padB = Math.max(0, oy + box - H0);
-      if (Math.max(padL, padT, padR, padB) > box * 0.25) {
-        skipped++; console.log(`  [skip] 顔が画像の端に寄りすぎ: ${file}`); continue;
-      }
-      const exLeft = ox + padL, exTop = oy + padT;
-      const exW = box - padL - padR, exH = box - padT - padB;
-
-      const id = path.basename(file, path.extname(file)).replace(/[^a-zA-Z0-9_-]/g, '') || `face${n}`;
-      const outName = `${id}.jpg`;
-
-      let region = sharp(workPng).extract({ left: exLeft, top: exTop, width: exW, height: exH });
-      if (padL || padT || padR || padB) {
-        region = region.extend({ left: padL, top: padT, right: padR, bottom: padB, extendWith: 'copy' });
-      }
-      const cropPng = await region.resize(args.size, args.size, { fit: 'fill' }).png().toBuffer();
-
-      await sharp(cropPng).jpeg({ quality: 82, mozjpeg: true }).toFile(path.join(outDir, outName));
-      const cropRaw = await sharp(cropPng).raw().toBuffer({ resolveWithObject: true });
-      const scale = args.size / box;
-      const pix = measurePixels(cropRaw.data, cropRaw.info.width, cropRaw.info.height, geo, scale, ox, oy);
-
-      const raw = {};
-      for (const [k, v] of Object.entries(geo)) if (!k.startsWith('_')) raw[k] = v;
-      for (const [k, v] of Object.entries(pix)) if (!k.startsWith('_')) raw[k] = v;
-      raw.ageLook = det.age;
-
-      if (debugDir) {
-        await sharp(cropPng)
-          .composite([{ input: debugOverlay(args.size, det.landmarks.positions, geo, raw, ox, oy, scale, pix._hairProbe), top: 0, left: 0 }])
-          .jpeg({ quality: 88 }).toFile(path.join(debugDir, outName));
+      const baseId = path.basename(file, path.extname(file)).replace(/[^a-zA-Z0-9_-]/g, '') || `face${n}`;
+      for (const [k, det] of dets.entries()) {
+        const id = dets.length > 1 ? `${baseId}_${k + 1}` : baseId;
+        const label = dets.length > 1 ? `${file} の${k + 1}人目` : file;
+        const res = await extractFace(det, { workPng, W0, H0, id, source: file, args, outDir, debugDir });
+        if (res.face) faces.push(res.face);
+        else { skipped++; console.log(`  [skip] ${res.reason}: ${label}`); }
       }
 
-      faces.push({
-        id, file: outName, source: file,
-        gender: det.gender, genderProbability: Number(det.genderProbability.toFixed(3)),
-        age: Number(det.age.toFixed(1)),
-        detScore: Number(det.detection.score.toFixed(3)),
-        raw: Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, Number.isFinite(v) ? Number(v.toFixed(5)) : null])),
-      });
       if ((n + 1) % 10 === 0 || n === files.length - 1) {
         console.log(`  ${n + 1}/${files.length} 解析済み (採用 ${faces.length - existing.length} / スキップ ${skipped})`);
       }
