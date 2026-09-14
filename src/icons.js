@@ -61,23 +61,3 @@ const UI_ICONS = {
 
 export const featureIcon = (key, opts) => svg(FEATURE_ICONS[key] ?? UI_ICONS.sparkle, opts);
 export const icon = (name, opts) => svg(UI_ICONS[name] ?? '', opts);
-
-/** 2枚の顔を見比べる様子のイラスト。スタート画面の主役。 */
-export const heroArt = () => `
-<svg class="hero-art" viewBox="0 0 240 130" fill="none" aria-hidden="true">
-  <g class="hero-card hero-card-l">
-    <rect x="14" y="16" width="82" height="98" rx="14" class="hero-plate"/>
-    <circle cx="55" cy="56" r="20" class="hero-head"/>
-    <path d="M35 100c0-12 9-20 20-20s20 8 20 20" class="hero-head"/>
-    <path d="M47 54c2-2 5-2 7 0M60 54c2-2 5-2 7 0" class="hero-face"/>
-  </g>
-  <g class="hero-card hero-card-r">
-    <rect x="144" y="16" width="82" height="98" rx="14" class="hero-plate"/>
-    <circle cx="185" cy="56" r="20" class="hero-head"/>
-    <path d="M165 100c0-12 9-20 20-20s20 8 20 20" class="hero-head"/>
-    <path d="M177 54h7M190 54h7" class="hero-face"/>
-  </g>
-  <g class="hero-heart">
-    <path d="M120 78s-14-8.8-14-18.6A8.4 8.4 0 0 1 120 54a8.4 8.4 0 0 1 14 5.4C134 69.2 120 78 120 78Z"/>
-  </g>
-</svg>`;

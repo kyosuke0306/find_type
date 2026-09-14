@@ -1,30 +1,31 @@
 :root {
-  --bg: #f7f3ef;
-  --bg-grad: radial-gradient(1200px 600px at 15% -5%, #ffe4d8 0%, transparent 55%),
-             radial-gradient(900px 500px at 95% 0%, #e2ebff 0%, transparent 50%);
+  /* 配色はアプリアイコンの青 #3b5b98 を基準にそろえている */
+  --bg: #f4f6fa;
+  --bg-grad: radial-gradient(1200px 600px at 15% -5%, #dfe7f7 0%, transparent 55%),
+             radial-gradient(900px 500px at 95% 0%, #e8edf8 0%, transparent 50%);
   --card: #ffffff;
-  --ink: #23201f;
-  --ink-dim: #6f6763;
-  --line: #e9e0da;
-  --accent: #e4685d;
-  --accent-soft: #fde8e4;
-  --accent-2: #5b73c4;
+  --ink: #1b2130;
+  --ink-dim: #5f6b80;
+  --line: #dde3ee;
+  --accent: #3b5b98;
+  --accent-soft: #e5ecf8;
+  --accent-2: #7d9ad6;
   --radius: 18px;
-  --shadow: 0 1px 2px rgba(40,25,20,.05), 0 10px 30px rgba(40,25,20,.08);
+  --shadow: 0 1px 2px rgba(20,30,60,.06), 0 10px 30px rgba(20,30,60,.09);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #17151a;
-    --bg-grad: radial-gradient(1200px 600px at 15% -5%, #3d2723 0%, transparent 55%),
-               radial-gradient(900px 500px at 95% 0%, #1e2440 0%, transparent 50%);
-    --card: #211e24;
-    --ink: #f0ebe8;
-    --ink-dim: #a79e9a;
-    --line: #35303a;
-    --accent: #f0776b;
-    --accent-soft: #3a2320;
-    --accent-2: #8ea2e8;
-    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.4);
+    --bg: #14171f;
+    --bg-grad: radial-gradient(1200px 600px at 15% -5%, #1e2a44 0%, transparent 55%),
+               radial-gradient(900px 500px at 95% 0%, #1a2136 0%, transparent 50%);
+    --card: #1d212b;
+    --ink: #e9edf5;
+    --ink-dim: #99a4b8;
+    --line: #2f3542;
+    --accent: #7f9fe0;
+    --accent-soft: #222d47;
+    --accent-2: #4f6cb0;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.45);
   }
 }
 
@@ -63,17 +64,13 @@ code {
 @keyframes bounce { 0%,100% { transform: translateY(0); opacity: .35; } 50% { transform: translateY(-9px); opacity: 1; } }
 
 /* ---------- スタート ---------- */
-.hero { display: flex; justify-content: center; margin: 4px 0 -4px; }
-.hero-art { width: min(100%, 300px); height: auto; }
-.hero-plate { fill: var(--card); stroke: var(--line); stroke-width: 2; }
-.hero-head { fill: none; stroke: var(--accent-2); stroke-width: 2.5; stroke-linecap: round; opacity: .75; }
-.hero-face { stroke: var(--ink-dim); stroke-width: 2; stroke-linecap: round; }
-.hero-card { transform-origin: center; animation: tilt 4s ease-in-out infinite; }
-.hero-card-r { animation-delay: -2s; }
-@keyframes tilt { 0%,100% { transform: translateY(0) rotate(-1.5deg); } 50% { transform: translateY(-5px) rotate(1.5deg); } }
-.hero-heart path { fill: var(--accent); stroke: none; }
-.hero-heart { transform-origin: 120px 66px; animation: beat 1.6s ease-in-out infinite; }
-@keyframes beat { 0%,100% { transform: scale(1); } 18% { transform: scale(1.18); } 36% { transform: scale(1); } 54% { transform: scale(1.1); } }
+.hero { display: flex; justify-content: center; margin: 8px 0 2px; }
+.hero img {
+  width: 116px; height: 116px; border-radius: 26px; display: block;
+  box-shadow: 0 10px 28px -8px rgba(59,91,152,.55), 0 2px 6px rgba(20,30,60,.15);
+  animation: float 3.6s ease-in-out infinite;
+}
+@keyframes float { 0%,100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-8px) rotate(1deg); } }
 
 .logo {
   font-size: 2rem; text-align: center; margin: 8px 0 2px;
@@ -173,11 +170,12 @@ code {
   position: absolute; inset: 0; display: grid; place-items: center;
   pointer-events: none; opacity: 0;
 }
-.burst { background: radial-gradient(circle at center, rgba(255,255,255,.5), transparent 65%); }
+.burst { background: radial-gradient(circle at center, rgba(255,255,255,.55), transparent 65%); }
 .burst .icon {
   width: 62px; height: 62px;
-  color: var(--accent); stroke: #fff; stroke-width: 1.4;
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,.35));
+  color: var(--accent); stroke: #fff; stroke-width: 2.2;
+  /* 写真の明暗にかかわらず見えるよう、白フチの外側にも影を重ねる */
+  filter: drop-shadow(0 0 3px rgba(255,255,255,.95)) drop-shadow(0 4px 12px rgba(0,0,0,.4));
 }
 .is-picked .burst { animation: burst .55s cubic-bezier(.2,.9,.3,1); }
 @keyframes burst {
@@ -217,7 +215,7 @@ code {
   background: var(--accent); color: #fff; font-size: .78rem; font-weight: 700;
   display: grid; place-items: center; box-shadow: var(--shadow);
 }
-.top-faces figure:first-child .rank { background: linear-gradient(135deg, #f0b429, #e4685d); }
+.top-faces figure:first-child .rank { background: linear-gradient(135deg, #f0b429, var(--accent)); }
 
 .feat { padding: 12px 0; border-bottom: 1px solid var(--line); }
 .feat:last-of-type { border-bottom: none; }

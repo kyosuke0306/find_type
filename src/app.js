@@ -2,7 +2,7 @@
 
 import { FEATURES, KEYS, normalizePool } from './features.js';
 import { fit, choosePair, updateStats, newStats, score, looAccuracy } from './model.js';
-import { icon, featureIcon, heroArt } from './icons.js';
+import { icon, featureIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => {
@@ -66,8 +66,6 @@ async function loadBundled() {
 
 /* ---------------- スタート画面 ---------------- */
 function buildStartScreen() {
-  $('hero').innerHTML = heroArt();
-
   const counts = state.pool.reduce((m, f) => (m[f.gender] = (m[f.gender] ?? 0) + 1, m), {});
   const nFemale = counts.female ?? 0, nMale = counts.male ?? 0;
   const options = [
