@@ -18,6 +18,26 @@ import * as faceapi from '@vladmandic/face-api/dist/face-api.node-wasm.js';
 import { measureGeometry, measurePixels, chooseBox } from '../src/measure.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+let MODEL_DIR = null;
+
+// 検出の入力サイズはアンカーの都合で画像との相性がある。
+// 顔が画面いっぱいに写っていると特定のサイズだけ検出できないことがあるため、
+// 複数のサイズを順に試し、それでも駄目なら別方式（SSD）に切り替える。
+const DET_SIZES = [416, 608, 320, 512];
+
+async function detect(tensor, minScore, multi) {
+  const run = async (opts) => multi
+    ? await faceapi.detectAllFaces(tensor, opts).withFaceLandmarks().withAgeAndGender()
+    : [await faceapi.detectSingleFace(tensor, opts).withFaceLandmarks().withAgeAndGender()].filter(Boolean);
+
+  for (const inputSize of DET_SIZES) {
+    const r = await run(new faceapi.TinyFaceDetectorOptions({ inputSize, scoreThreshold: minScore }));
+    if (r.length) return r;
+  }
+  // 最後の手段。モデルが大きいので必要になったときだけ読み込む。
+  if (!faceapi.nets.ssdMobilenetv1.isLoaded) await faceapi.nets.ssdMobilenetv1.loadFromDisk(MODEL_DIR);
+  return run(new faceapi.SsdMobilenetv1Options({ minConfidence: Math.min(minScore, 0.3) }));
+}
 
 function parseArgs(argv) {
   const a = { from: null, out: 'data/faces', json: 'data/faces.json', size: 480, minScore: 0.45, append: false, limit: Infinity, debug: null, multi: false, gender: null };
@@ -55,6 +75,7 @@ async function initModels() {
   await faceapi.nets.tinyFaceDetector.loadFromDisk(modelDir);
   await faceapi.nets.faceLandmark68Net.loadFromDisk(modelDir);
   await faceapi.nets.ageGenderNet.loadFromDisk(modelDir);
+  MODEL_DIR = modelDir;
   return tf.getBackend();
 }
 
@@ -196,7 +217,6 @@ async function main() {
     process.exit(1);
   }
 
-  const detOpts = new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: args.minScore });
   const faces = [...existing];
   let skipped = 0;
 
@@ -214,9 +234,7 @@ async function main() {
       const { width: W0, height: H0 } = work.info;
 
       const t = tf.tensor3d(new Uint8Array(work.data), [H0, W0, 3]);
-      const dets = args.multi
-        ? await faceapi.detectAllFaces(t, detOpts).withFaceLandmarks().withAgeAndGender()
-        : [await faceapi.detectSingleFace(t, detOpts).withFaceLandmarks().withAgeAndGender()].filter(Boolean);
+      const dets = await detect(t, args.minScore, args.multi);
       t.dispose();
       if (!dets.length) { skipped++; console.log(`  [skip] 顔を検出できません: ${file}`); continue; }
 

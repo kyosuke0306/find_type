@@ -60,6 +60,8 @@ const FRAMING_PARTS = [
   'wearing a plain light grey crew-neck t-shirt',
   'sharp focus, photorealistic, 50mm lens, natural skin texture',
   'no glasses, no hat, no jewelry, no visible makeup product, hair not covering the eyebrows',
+  // 生成器は放っておくと同じ顔を髪型だけ変えて使い回す。毎回別人にさせる。
+  'a completely different individual from the previous images, distinct facial structure',
 ];
 const FRAMING = FRAMING_PARTS.join(', ');
 

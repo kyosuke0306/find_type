@@ -9,7 +9,8 @@
     "generate": "node tools/generate.mjs",
     "analyze": "node tools/analyze.mjs",
     "test": "node test/simulate.mjs 30 60",
-    "noise-check": "node tools/noise-check.mjs"
+    "noise-check": "node tools/noise-check.mjs",
+    "find-duplicates": "node tools/find-duplicates.mjs"
   },
   "devDependencies": {
     "@tensorflow/tfjs": "4.22.0",
