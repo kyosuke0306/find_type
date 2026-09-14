@@ -184,7 +184,12 @@ npm run analyze -- --from .cache/raw
 | `--model` | `gemini-3.1-flash-image` | `--list-models` で利用可能なモデルを確認できます |
 | `--image-size` | `0.5K` | 出力解像度。単価に直結します（0.5K なら1枚 $0.045 程度） |
 | `--ethnicity` | `japanese` | `japanese` / `eastasian` / `mixed` / `global` |
-| `--vibe` | `cute` | `cute`（若くてかわいい）/ `neutral`（指定なし） |
+| `--vibe` | `cute` | `cute`（かわいい雰囲気）/ `neutral`（指定なし） |
+
+年齢は10代後半から30代（18・19・23・27・32・37歳）を均等に割り当てます。
+顔を好みで採点するアプリのため、未成年にあたる年齢は生成しません。
+年齢を1点に揃えないのは、揃えると「顔立ちの印象（童顔↔大人顔）」の軸が
+測れなくなるためです。
 | `--female-ratio` | 0.5 | 女性の割合 |
 | `--dry-run` | – | 課金せずプロンプトだけ書き出す |
 

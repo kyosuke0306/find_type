@@ -22,9 +22,10 @@ const AXES = {
   hair: ['very short cropped hair', 'short hair above the ears', 'chin-length bob', 'shoulder-length hair', 'long hair past the chest'],
   hairColor: ['jet black hair', 'dark brown hair', 'light brown hair', 'ash grey hair', 'blonde hair'],
   skin: ['fair pale skin', 'light skin', 'medium olive skin', 'tan brown skin', 'deep brown skin'],
-  // 「若くてかわいい人の中で好みを診断する」ため年齢は狭めに取る。
-  // ただし完全に同じにすると「顔立ちの印象」の軸が測れなくなるので幅は残す。
-  age: ['18 years old', '20 years old', '22 years old', '25 years old', '28 years old'],
+  // 10代後半から30代まで。顔を好みで採点するアプリなので、
+  // 未成年にあたる年齢は生成しない（10代は18・19歳のみ）。
+  // 「顔立ちの印象」の軸を測るために、各年代に散らしている。
+  age: ['18 years old', '19 years old', '23 years old', '27 years old', '32 years old', '37 years old'],
 };
 
 const ETHNICITY = {
