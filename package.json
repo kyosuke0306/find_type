@@ -1,0 +1,19 @@
+{
+  "name": "find-type",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "2枚の顔を見比べる選択を繰り返して、好みの顔の傾向を診断するWebアプリ",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "generate": "node tools/generate.mjs",
+    "analyze": "node tools/analyze.mjs",
+    "test": "node test/simulate.mjs 30 60"
+  },
+  "devDependencies": {
+    "@tensorflow/tfjs": "4.22.0",
+    "@tensorflow/tfjs-backend-wasm": "4.22.0",
+    "@vladmandic/face-api": "^1.7.15",
+    "sharp": "^0.34.0"
+  }
+}
