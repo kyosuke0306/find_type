@@ -43,12 +43,13 @@ const FRAMING = [
 ].join(', ');
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', ethnicity: 'mixed', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'mixed', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
     else if (k === '--out') a.out = argv[++i];
     else if (k === '--model') a.model = argv[++i];
+    else if (k === '--image-size') a.imageSize = argv[++i];
     else if (k === '--ethnicity') a.ethnicity = argv[++i];
     else if (k === '--female-ratio') a.femaleRatio = Number(argv[++i]);
     else if (k === '--concurrency') a.concurrency = Number(argv[++i]);
@@ -108,12 +109,15 @@ async function listModels(key) {
 class QuotaZeroError extends Error {}
 
 /** Gemini image (generateContent) と Imagen (predict) の両方に対応する */
-async function generateOne(key, model, prompt) {
+async function generateOne(key, model, prompt, imageSize) {
   const isImagen = /imagen/i.test(model);
   const url = isImagen ? `${API}/models/${model}:predict?key=${key}` : `${API}/models/${model}:generateContent?key=${key}`;
+  // 解像度は料金に直結する（低いほど安い）。このアプリは最終的に縮小するので小さくてよい。
+  // ただしモデルごとに受け付ける値が違うため、拒否されたら指定を外して再試行する。
+  const imageConfig = { aspectRatio: '1:1', ...(imageSize ? { imageSize } : {}) };
   const body = isImagen
     ? { instances: [{ prompt }], parameters: { sampleCount: 1, aspectRatio: '1:1', personGeneration: 'allow_adult' } }
-    : { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '1:1' } } };
+    : { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE'], imageConfig } };
 
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const json = await res.json();
@@ -131,6 +135,10 @@ async function generateOne(key, model, prompt) {
     const e = new Error(`レート制限。${wait.toFixed(0)}秒待ちます`);
     e.retryAfter = wait;
     throw e;
+  }
+  if (res.status === 400 && imageSize && /image[_ ]?size/i.test(json?.error?.message ?? '')) {
+    console.log(`  imageSize=${imageSize} は ${model} では使えないため、指定なしで続行します`);
+    return generateOne(key, model, prompt, null);
   }
   if (!res.ok) throw new Error(`${res.status} ${JSON.stringify(json).slice(0, 300)}`);
 
@@ -178,7 +186,7 @@ async function main() {
       // レート制限のときだけ待って数回やり直す
       for (let attempt = 0; attempt < 4; attempt++) {
         try {
-          const buf = await generateOne(key, args.model, p.text);
+          const buf = await generateOne(key, args.model, p.text, args.imageSize);
           await fs.writeFile(file, buf);
           meta.push({ file: `${name}.png`, ...p });
           done++;

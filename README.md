@@ -89,9 +89,22 @@ GEMINI_API_KEY=xxxx npm run generate -- --count 160 --out .cache/raw
 APIキーは [Google AI Studio](https://aistudio.google.com/apikey) で取得できます。
 
 > **Gemini の画像生成には課金の有効化が必要です。**
-> 無料枠では画像モデルの上限が 0 に設定されており、1枚も生成できません
-> （`limit: 0` というエラーになります）。AI Studio の "Set up Billing" から有効化してください。
+> 画像生成モデルには無料枠が存在せず（料金表の無料枠欄が「利用不可」）、
+> 無料枠のプロジェクトからは `limit: 0` のエラーになって1枚も生成できません。
+> AI Studio の "Set up Billing" から有効化してください。
+> なお AI Studio の画面上での生成は無料ですが、API経由とは別枠です。
 > 課金を有効にしたくない場合は、後述の **B** の方法で他のツールの出力を取り込めます。
+
+料金は出力解像度で変わります。このアプリは取り込み時に 480px へ縮小するため、
+既定では最小の `0.5K` を指定しています。
+
+| 解像度 | 1枚あたり | 160枚 |
+|---|---|---|
+| 0.5K（既定） | $0.045 | 約 $7 |
+| 1K | $0.067 | 約 $11 |
+
+（入力プロンプトは1枚あたり約120トークンで、合計しても1セント未満です。
+最新の単価は[料金ページ](https://ai.google.dev/gemini-api/docs/pricing)を確認してください。）
 
 診断の精度は**プールが特徴空間をどれだけ広くカバーするか**で決まるため、
 輪郭・目・眉・鼻・唇・髪・肌・年齢の属性グリッドから均等に組み合わせを引いてプロンプトを作ります。
@@ -101,6 +114,7 @@ APIキーは [Google AI Studio](https://aistudio.google.com/apikey) で取得で
 |---|---|---|
 | `--count` | 160 | 生成枚数 |
 | `--model` | `gemini-3.1-flash-image` | 利用可能なモデルは `npm run generate -- --list-models` で確認できます |
+| `--image-size` | `0.5K` | 出力解像度。モデルが受け付けない場合は自動で指定を外して続行します |
 | `--ethnicity` | `mixed` | `eastasian` / `mixed` / `global` |
 | `--female-ratio` | 0.5 | 女性の割合 |
 | `--dry-run` | – | 課金せずプロンプトだけ確認 |
