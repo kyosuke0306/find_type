@@ -88,6 +88,11 @@ GEMINI_API_KEY=xxxx npm run generate -- --count 160 --out .cache/raw
 
 APIキーは [Google AI Studio](https://aistudio.google.com/apikey) で取得できます。
 
+> **Gemini の画像生成には課金の有効化が必要です。**
+> 無料枠では画像モデルの上限が 0 に設定されており、1枚も生成できません
+> （`limit: 0` というエラーになります）。AI Studio の "Set up Billing" から有効化してください。
+> 課金を有効にしたくない場合は、後述の **B** の方法で他のツールの出力を取り込めます。
+
 診断の精度は**プールが特徴空間をどれだけ広くカバーするか**で決まるため、
 輪郭・目・眉・鼻・唇・髪・肌・年齢の属性グリッドから均等に組み合わせを引いてプロンプトを作ります。
 肌の色や髪の長さの実測を安定させるため、構図と背景は全カットで固定しています。
@@ -95,12 +100,13 @@ APIキーは [Google AI Studio](https://aistudio.google.com/apikey) で取得で
 | オプション | 既定値 | 説明 |
 |---|---|---|
 | `--count` | 160 | 生成枚数 |
-| `--model` | `imagen-4.0-fast-generate-001` | `--list-models` で利用可能なモデルを確認できます |
+| `--model` | `gemini-3.1-flash-image` | 利用可能なモデルは `npm run generate -- --list-models` で確認できます |
 | `--ethnicity` | `mixed` | `eastasian` / `mixed` / `global` |
 | `--female-ratio` | 0.5 | 女性の割合 |
 | `--dry-run` | – | 課金せずプロンプトだけ確認 |
 
 生成は途中で止めても、再実行すれば既存ファイルを飛ばして続きから進みます。
+レート制限は自動で待って再試行します。
 
 #### B. 他のツールで作った画像を使う
 

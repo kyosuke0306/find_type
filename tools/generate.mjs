@@ -43,7 +43,7 @@ const FRAMING = [
 ].join(', ');
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'imagen-4.0-fast-generate-001', ethnicity: 'mixed', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', ethnicity: 'mixed', femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -104,22 +104,43 @@ async function listModels(key) {
   }
 }
 
-/** Imagen (predict) と Gemini image (generateContent) の両方に対応する */
+/** 課金が無効なプロジェクトでは画像モデルの上限が 0 になるため、それを見分ける */
+class QuotaZeroError extends Error {}
+
+/** Gemini image (generateContent) と Imagen (predict) の両方に対応する */
 async function generateOne(key, model, prompt) {
   const isImagen = /imagen/i.test(model);
   const url = isImagen ? `${API}/models/${model}:predict?key=${key}` : `${API}/models/${model}:generateContent?key=${key}`;
   const body = isImagen
     ? { instances: [{ prompt }], parameters: { sampleCount: 1, aspectRatio: '1:1', personGeneration: 'allow_adult' } }
-    : { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE'] } };
+    : { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '1:1' } } };
 
   const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const json = await res.json();
+
+  if (res.status === 429) {
+    const msg = json?.error?.message ?? '';
+    // 「limit: 0」は一時的な混雑ではなく、そのモデルが使えないという意味なので待っても無駄
+    if (/limit:\s*0\b/.test(msg)) {
+      throw new QuotaZeroError(
+        `モデル ${model} は現在のプロジェクトで利用できません（無料枠の上限が 0 です）。\n` +
+        '  Gemini の画像生成には課金の有効化が必要です: https://aistudio.google.com/ の "Set up Billing"\n' +
+        '  課金を有効にしたくない場合は、別のツールで画像を作って tools/analyze.mjs に渡してください。');
+    }
+    const wait = Number(/retry in ([\d.]+)s/i.exec(msg)?.[1] ?? 20);
+    const e = new Error(`レート制限。${wait.toFixed(0)}秒待ちます`);
+    e.retryAfter = wait;
+    throw e;
+  }
   if (!res.ok) throw new Error(`${res.status} ${JSON.stringify(json).slice(0, 300)}`);
 
   const b64 = isImagen
     ? json.predictions?.[0]?.bytesBase64Encoded
     : json.candidates?.[0]?.content?.parts?.find((p) => p.inlineData)?.inlineData?.data;
-  if (!b64) throw new Error(`画像が返りませんでした: ${JSON.stringify(json).slice(0, 300)}`);
+  if (!b64) {
+    const reason = json.candidates?.[0]?.finishReason ?? json.promptFeedback?.blockReason ?? '不明';
+    throw new Error(`画像が返りませんでした (${reason})`);
+  }
   return Buffer.from(b64, 'base64');
 }
 
@@ -146,28 +167,44 @@ async function main() {
   let done = 0, failed = 0;
 
   const queue = prompts.slice();
+  let fatal = null;
   const workers = Array.from({ length: Math.max(1, args.concurrency) }, async () => {
-    while (queue.length) {
+    while (queue.length && !fatal) {
       const p = queue.shift();
       const name = `${String(p.index).padStart(4, '0')}_${p.gender}`;
       const file = path.join(outDir, `${name}.png`);
       try { await fs.access(file); done++; continue; } catch { /* 未生成 */ }
-      try {
-        const buf = await generateOne(key, args.model, p.text);
-        await fs.writeFile(file, buf);
-        meta.push({ file: `${name}.png`, ...p });
-        done++;
-        if (done % 10 === 0) console.log(`  ${done}/${prompts.length} 生成済み (失敗 ${failed})`);
-      } catch (e) {
-        failed++;
-        console.log(`  [fail ${p.index}] ${e.message.slice(0, 160)}`);
-        await new Promise((r) => setTimeout(r, 1500));
+
+      // レート制限のときだけ待って数回やり直す
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          const buf = await generateOne(key, args.model, p.text);
+          await fs.writeFile(file, buf);
+          meta.push({ file: `${name}.png`, ...p });
+          done++;
+          if (done % 10 === 0) console.log(`  ${done}/${prompts.length} 生成済み (失敗 ${failed})`);
+          break;
+        } catch (e) {
+          if (e instanceof QuotaZeroError) { fatal = e; break; }
+          if (e.retryAfter && attempt < 3) {
+            await new Promise((r) => setTimeout(r, (e.retryAfter + 1) * 1000));
+            continue;
+          }
+          failed++;
+          console.log(`  [fail ${p.index}] ${e.message.slice(0, 200)}`);
+          break;
+        }
       }
     }
   });
   await Promise.all(workers);
 
-  await fs.writeFile(path.join(outDir, 'prompts.json'), JSON.stringify(meta, null, 1));
+  if (meta.length) await fs.writeFile(path.join(outDir, 'prompts.json'), JSON.stringify(meta, null, 1));
+  if (fatal) {
+    console.error(`\n中断しました。\n${fatal.message}`);
+    console.error(`\n利用できるモデルの確認: node tools/generate.mjs --list-models`);
+    process.exit(1);
+  }
   console.log(`\n完了: ${done} 枚 → ${outDir}  (失敗 ${failed})`);
   console.log(`次: node tools/analyze.mjs --from ${args.out}`);
 }
