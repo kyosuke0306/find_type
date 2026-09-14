@@ -4,17 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>顔の好み診断</title>
-<meta name="description" content="2枚の顔を見比べる選択を繰り返して、自分がどんな顔をタイプだと感じているかを診断します。">
+<meta name="description" content="2枚の顔から好きなほうを選ぶだけ。繰り返すと、どんな顔がタイプかが見えてきます。">
 <link rel="stylesheet" href="styles.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>👀</text></svg>">
 </head>
 <body>
 <main id="app">
 
-  <!-- 読み込み中 -->
   <section id="screen-loading" class="screen">
-    <h1 class="logo">顔の好み診断</h1>
-    <p class="lead" id="loading-text">読み込み中…</p>
+    <div class="loader"><span></span><span></span><span></span></div>
   </section>
 
   <!-- 顔画像が足りないとき -->
@@ -23,40 +21,26 @@
     <div class="card note">
       <h2>顔画像を用意してください</h2>
       <p class="dim" id="setup-reason"></p>
-      <p>このアプリは <code>data/faces.json</code> と <code>data/faces/</code> の顔画像を使います。
-         次の手順で用意してください。</p>
       <ol class="steps">
         <li><code>npm install</code></li>
-        <li><code>npm run generate -- --dry-run --count 24 --female-ratio 1</code><br>
-            <span class="dim">書き出されたプロンプトで顔画像を生成し、1つのフォルダに保存します</span></li>
+        <li><code>npm run generate -- --dry-run --count 24 --female-ratio 1</code></li>
         <li><code>npm run analyze -- --from &lt;画像フォルダ&gt; --gender female</code></li>
       </ol>
     </div>
   </section>
 
-  <!-- スタート画面 -->
+  <!-- スタート -->
   <section id="screen-start" class="screen" hidden>
+    <div class="hero" id="hero"></div>
     <h1 class="logo">顔の好み診断</h1>
-    <p class="lead">2枚の顔から「好きなほう」を選ぶだけ。<br>繰り返すうちに、あなたがどんな顔をタイプだと感じているかが見えてきます。</p>
+    <p class="lead">好きなほうを選ぶだけ</p>
 
     <div class="card">
-      <div class="field">
-        <label class="field-label">診断する顔</label>
-        <div class="choices" id="gender-choices" role="radiogroup" aria-label="診断する顔"></div>
-      </div>
-      <div class="field">
-        <label class="field-label">回数</label>
-        <div class="choices" id="rounds-choices" role="radiogroup" aria-label="回数">
-          <button class="choice" data-value="20">20回<span class="sub">サクッと</span></button>
-          <button class="choice is-on" data-value="30">30回<span class="sub">おすすめ</span></button>
-          <button class="choice" data-value="45">45回<span class="sub">じっくり</span></button>
-        </div>
-        <p class="hint" id="rounds-hint"></p>
-      </div>
-      <button id="btn-start" class="btn btn-primary btn-block">はじめる</button>
-      <button id="btn-last-result" class="btn btn-ghost btn-block" hidden>前回の結果を見る</button>
+      <div class="choices" id="gender-choices" role="radiogroup" aria-label="診断する顔"></div>
+      <div class="choices" id="rounds-choices" role="radiogroup" aria-label="回数"></div>
+      <button id="btn-start" class="btn btn-primary btn-block btn-icon"></button>
+      <button id="btn-last-result" class="btn btn-ghost btn-block btn-icon" hidden></button>
     </div>
-    <p class="footnote" id="pool-info"></p>
   </section>
 
   <!-- 診断中 -->
@@ -65,65 +49,64 @@
       <div class="progress"><div class="progress-fill" id="progress-fill"></div></div>
       <div class="play-meta">
         <span id="round-label">1 / 30</span>
-        <button id="btn-undo" class="btn btn-mini" disabled>1つ戻る</button>
+        <button id="btn-undo" class="btn-round" aria-label="1つ戻る" disabled></button>
       </div>
     </header>
 
-    <p class="question">どちらが好み？</p>
     <div class="arena">
       <button class="face-card" data-side="0">
-        <img alt="顔A" id="img-0">
-        <span class="pick-badge">こっち</span>
-        <kbd class="key-hint">←</kbd>
+        <img alt="左の顔" id="img-0">
+        <span class="burst"></span>
       </button>
+      <span class="vs" id="vs"></span>
       <button class="face-card" data-side="1">
-        <img alt="顔B" id="img-1">
-        <span class="pick-badge">こっち</span>
-        <kbd class="key-hint">→</kbd>
+        <img alt="右の顔" id="img-1">
+        <span class="burst"></span>
       </button>
     </div>
-    <button id="btn-skip" class="btn btn-ghost btn-block">どちらもピンとこない（スキップ）</button>
-    <p class="footnote">キーボード: ← → で選択 / Space でスキップ / Backspace で戻る</p>
+
+    <button id="btn-skip" class="btn btn-ghost btn-block btn-icon"></button>
   </section>
 
   <!-- 結果 -->
   <section id="screen-result" class="screen" hidden>
-    <p class="result-kicker">あなたのタイプは</p>
+    <p class="result-kicker">あなたのタイプ</p>
     <h1 class="result-title" id="result-title">—</h1>
-    <p class="result-sub" id="result-sub"></p>
+    <div class="result-tags" id="result-tags"></div>
 
-    <div class="card">
-      <h2 class="card-title">好みに近い顔</h2>
-      <p class="card-note">あなたの選択から推定した好みで、全<span id="pool-count">—</span>枚を採点した上位です。</p>
+    <div class="card reveal" style="--i:0">
+      <h2 class="card-title" id="t-top"></h2>
       <div class="top-faces" id="top-faces"></div>
     </div>
 
-    <div class="card">
-      <h2 class="card-title">重視していた特徴</h2>
-      <p class="card-note">バーが長いほど「選ぶときに効いていた」項目です。▼ が好みの位置を表します。</p>
+    <div class="card reveal" style="--i:1">
+      <h2 class="card-title" id="t-feat"></h2>
       <div id="feature-list"></div>
-      <button id="btn-show-rest" class="btn btn-ghost btn-block">こだわりが薄かった項目も見る</button>
+      <button id="btn-show-rest" class="btn btn-ghost btn-block">もっと見る</button>
     </div>
 
-    <div class="card">
-      <h2 class="card-title">好みの一貫性</h2>
-      <div class="consistency">
-        <div class="consistency-num" id="consistency-num">—</div>
-        <div>
-          <p id="consistency-label" class="consistency-label">—</p>
-          <p class="card-note" id="consistency-note"></p>
-        </div>
+    <div class="card reveal consistency-card" style="--i:2">
+      <div class="gauge">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle class="gauge-track" cx="50" cy="50" r="42"/>
+          <circle class="gauge-fill" id="gauge-fill" cx="50" cy="50" r="42"/>
+        </svg>
+        <span class="gauge-num" id="consistency-num">0%</span>
+      </div>
+      <div>
+        <p class="consistency-label" id="consistency-label">—</p>
+        <p class="card-note">選択のブレの少なさ</p>
       </div>
     </div>
 
-    <div class="card">
-      <h2 class="card-title">あなたが選んだ顔</h2>
+    <div class="card reveal" style="--i:3">
+      <h2 class="card-title" id="t-chosen"></h2>
       <div class="chosen-strip" id="chosen-strip"></div>
     </div>
 
     <div class="actions">
-      <button id="btn-copy" class="btn btn-primary btn-block">結果をコピー</button>
-      <button id="btn-again" class="btn btn-ghost btn-block">もう一度やる</button>
+      <button id="btn-copy" class="btn btn-primary btn-block btn-icon"></button>
+      <button id="btn-again" class="btn btn-ghost btn-block btn-icon"></button>
     </div>
   </section>
 

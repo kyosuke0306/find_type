@@ -2,6 +2,7 @@
 
 import { FEATURES, KEYS, normalizePool } from './features.js';
 import { fit, choosePair, updateStats, newStats, score, looAccuracy } from './model.js';
+import { icon, featureIcon, heroArt } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id) => {
@@ -33,7 +34,6 @@ const state = {
 init();
 
 async function init() {
-  $('loading-text').textContent = '顔を読み込み中…';
   try {
     await reloadPool();
   } catch (e) {
@@ -66,42 +66,44 @@ async function loadBundled() {
 
 /* ---------------- スタート画面 ---------------- */
 function buildStartScreen() {
+  $('hero').innerHTML = heroArt();
+
   const counts = state.pool.reduce((m, f) => (m[f.gender] = (m[f.gender] ?? 0) + 1, m), {});
   const nFemale = counts.female ?? 0, nMale = counts.male ?? 0;
   const options = [
-    { value: 'female', label: '女性の顔', n: nFemale },
-    { value: 'male', label: '男性の顔', n: nMale },
+    { value: 'female', label: '女性', ic: 'female', n: nFemale },
+    { value: 'male', label: '男性', ic: 'male', n: nMale },
   ].filter((o) => o.n >= MIN_FACES);
-  // 「両方」は両方の性別が単独で足りているときだけ意味がある。
-  // 片方しかいないプールで出すと同じ選択肢が2つ並んでしまう。
+  // 「両方」は両方の性別が単独で足りているときだけ意味がある
   if (nFemale >= MIN_FACES && nMale >= MIN_FACES) {
-    options.push({ value: 'all', label: '両方', n: state.pool.length });
+    options.push({ value: 'all', label: '両方', ic: 'both', n: state.pool.length });
   } else if (!options.length && state.pool.length >= MIN_FACES) {
-    options.push({ value: 'all', label: 'すべての顔', n: state.pool.length });
+    options.push({ value: 'all', label: 'すべて', ic: 'both', n: state.pool.length });
   }
 
-  const box = $('gender-choices');
-  box.innerHTML = '';
-  options.forEach((o, i) => {
-    const b = document.createElement('button');
-    b.className = 'choice' + (i === 0 ? ' is-on' : '');
-    b.dataset.value = o.value;
-    b.innerHTML = `${o.label}<span class="sub">${o.n}枚</span>`;
-    box.appendChild(b);
-  });
+  $('gender-choices').className = `choices${options.length === 1 ? ' is-single' : ''}`;
+  $('gender-choices').innerHTML = options.map((o, i) =>
+    `<button class="choice${i === 0 ? ' is-on' : ''}" data-value="${o.value}">
+       ${icon(o.ic)}<span>${o.label}</span><span class="sub">${o.n}枚</span>
+     </button>`).join('');
   state.gender = options[0]?.value ?? 'all';
-  box.previousElementSibling.textContent = options.length > 1
-    ? '診断する顔'
-    : '診断する顔（今のプールにはこれだけあります）';
-  bindChoices(box, (v) => { state.gender = v; updateRoundsHint(); });
-  bindChoices($('rounds-choices'), (v) => { state.rounds = Number(v); updateRoundsHint(); });
-  updateRoundsHint();
 
-  $('pool-info').textContent = `顔画像 ${state.pool.length} 枚 / 診断項目 ${FEATURES.length} 個`;
+  $('rounds-choices').innerHTML = [
+    { v: 20, label: 'さくっと' }, { v: 30, label: 'おすすめ' }, { v: 45, label: 'じっくり' },
+  ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
+      <span class="big">${r.v}</span><span class="sub">${r.label}</span></button>`).join('');
+
+  bindChoices($('gender-choices'), (v) => { state.gender = v; });
+  bindChoices($('rounds-choices'), (v) => { state.rounds = Number(v); });
+
+  $('btn-start').innerHTML = `${icon('play')}<span>はじめる</span>`;
   $('btn-start').onclick = startSession;
-  $('btn-last-result').hidden = !localStorage.getItem(STORE_KEY);
+
+  const last = localStorage.getItem(STORE_KEY);
+  $('btn-last-result').hidden = !last;
+  $('btn-last-result').innerHTML = `${icon('chart')}<span>前回の結果</span>`;
   $('btn-last-result').onclick = () => {
-    try { renderResult(JSON.parse(localStorage.getItem(STORE_KEY))); show('screen-result'); }
+    try { renderResult(JSON.parse(last)); show('screen-result'); }
     catch { localStorage.removeItem(STORE_KEY); }
   };
 }
@@ -114,12 +116,6 @@ function bindChoices(box, onPick) {
     b.classList.add('is-on');
     onPick(b.dataset.value);
   };
-}
-
-function updateRoundsHint() {
-  // test/simulate.mjs で測った、仮想ユーザーの好みを当てられた割合
-  const acc = { 20: 78, 30: 83, 45: 86 }[state.rounds] ?? 83;
-  $('rounds-hint').textContent = `シミュレーションでの推定精度の目安: 約${acc}%`;
 }
 
 /* ---------------- 診断の進行 ---------------- */
@@ -145,7 +141,11 @@ function renderPair() {
   const [a, b] = state.pair;
   $('img-0').src = a.src;
   $('img-1').src = b.src;
-  document.querySelectorAll('.face-card').forEach((c) => c.classList.remove('is-picked'));
+  document.querySelectorAll('.face-card').forEach((c) => {
+    c.classList.remove('is-picked', 'is-dropped');
+    // 入場アニメーションをやり直させる
+    c.style.animation = 'none'; void c.offsetWidth; c.style.animation = '';
+  });
   $('round-label').textContent = `${state.round + 1} / ${state.rounds}`;
   $('progress-fill').style.width = `${(state.round / state.rounds) * 100}%`;
   $('btn-undo').disabled = state.history.length === 0;
@@ -165,7 +165,9 @@ function choose(side) {
   if (state.busy || !state.pair) return;
   const [a, b] = state.pair;
   const win = side === 0 ? a : b, lose = side === 0 ? b : a;
-  document.querySelectorAll('.face-card')[side].classList.add('is-picked');
+  const cards = document.querySelectorAll('.face-card');
+  cards[side].classList.add('is-picked');
+  cards[1 - side].classList.add('is-dropped');
   state.busy = true;
 
   setTimeout(() => {
@@ -176,7 +178,7 @@ function choose(side) {
     if (state.history.length >= 6) state.model = fit(comparisons());
     state.busy = false;
     nextRound();
-  }, 140);
+  }, 420);
 }
 
 function skip() {
@@ -252,35 +254,60 @@ function typeName(r) {
 }
 
 function renderResult(r) {
+  const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]);
   $('result-title').textContent = typeName(r);
-  const top = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a])[0];
-  $('result-sub').textContent =
-    `${r.rounds}回の選択から推定${r.skipped ? `（スキップ ${r.skipped}回）` : ''}。`
-    + `いちばん効いていたのは「${FEATURES[top].name}」でした。`;
 
-  $('pool-count').textContent = r.poolSize;
+  // 上位項目をタグで見せる（説明文の代わり）。
+  // 重視度がほぼ0の項目を並べても意味がないので、目立つものだけ出す。
+  const shown = order.filter((i) => r.importance[i] >= 0.05).slice(0, 3);
+  $('result-tags').innerHTML = (shown.length ? shown : order.slice(0, 1)).map((i, n) =>
+    `<span class="tag" style="--i:${n}">${featureIcon(KEYS[i])}${FEATURES[i].name}
+       <b>${Math.round(r.importance[i] * 100)}%</b></span>`).join('');
+
+  $('t-top').innerHTML = `${icon('crown')}好みに近い顔`;
+  $('t-feat').innerHTML = `${icon('chart')}効いていた特徴`;
+  $('t-chosen').innerHTML = `${icon('heart')}選んだ顔 <span class="card-note">${r.chosen.length}枚</span>`;
+
   const srcOf = (id) => state.byId.get(id)?.src ?? '';
   $('top-faces').innerHTML = r.top.filter((id) => srcOf(id)).map((id, i) => `
     <figure><img src="${srcOf(id)}" alt="好みに近い顔 ${i + 1}位" loading="lazy">
-    <figcaption>${i + 1}位</figcaption></figure>`).join('');
+    <span class="rank">${i + 1}</span></figure>`).join('');
 
   renderFeatures(r);
 
   const pct = Math.round((r.loo ?? r.trainAccuracy) * 100);
-  $('consistency-num').textContent = `${pct}%`;
-  const label = pct >= 85 ? '好みがはっきりしています'
+  $('consistency-label').textContent = pct >= 85 ? '好みがはっきりしています'
     : pct >= 72 ? '好みは一貫しています'
     : pct >= 60 ? 'ややブレがあります'
-    : '気分で選んでいるかもしれません';
-  $('consistency-label').textContent = label;
-  $('consistency-note').textContent =
-    '1問を隠して残りから学習し、その1問を当てられた割合です（交差検証）。'
-    + '高いほど、選択が一定の基準にもとづいていることを意味します。';
+    : '気分で選んでいるかも';
 
-  $('chosen-strip').innerHTML = r.chosen.filter((id) => srcOf(id)).map((id) => `<img src="${srcOf(id)}" alt="" loading="lazy">`).join('');
+  $('chosen-strip').innerHTML = r.chosen.filter((id) => srcOf(id))
+    .map((id) => `<img src="${srcOf(id)}" alt="" loading="lazy">`).join('');
 
+  $('btn-again').innerHTML = `${icon('replay')}<span>もう一度</span>`;
   $('btn-again').onclick = () => { buildStartScreen(); show('screen-start'); };
+  $('btn-copy').innerHTML = `${icon('copy')}<span>結果をコピー</span>`;
   $('btn-copy').onclick = () => copyResult(r);
+
+  // 描画が終わってからバー・ゲージ・数値を動かす
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.feat-fill').forEach((el) => { el.style.width = el.dataset.w; });
+    document.querySelectorAll('.marker').forEach((el) => { el.style.left = el.dataset.left; });
+    $('gauge-fill').style.strokeDashoffset = String(264 - 264 * (pct / 100));
+    countUp($('consistency-num'), pct);
+  });
+}
+
+/** 数値を 0 から目標値まで数え上げる */
+function countUp(el, target, ms = 1100) {
+  const t0 = performance.now();
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / ms);
+    const eased = 1 - (1 - k) ** 3;
+    el.textContent = `${Math.round(target * eased)}%`;
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 function renderFeatures(r) {
@@ -291,19 +318,19 @@ function renderFeatures(r) {
   const strong = order.slice(0, nStrong);
   const weak = order.slice(nStrong);
 
-  const row = (i) => {
+  const row = (i, n) => {
     const f = FEATURES[i], m = r.m[i], imp = r.importance[i];
-    const isWeak = imp < 0.05;
-    return `<div class="feat${isWeak ? ' is-weak' : ''}">
+    return `<div class="feat${imp < 0.05 ? ' is-weak' : ''}" style="--i:${n}">
       <div class="feat-head">
+        ${featureIcon(f.key)}
         <span class="feat-name">${f.name}</span>
-        <span class="feat-pct">${Math.round(imp * 100)}%<span class="feat-support"> ・差のあった比較 ${r.support?.[i] ?? 0}回</span></span>
+        <span class="feat-pct">${Math.round(imp * 100)}%</span>
       </div>
-      <div class="feat-bar"><div class="feat-fill" style="width:${(imp / max) * 100}%"></div></div>
+      <div class="feat-bar"><div class="feat-fill" data-w="${(imp / max) * 100}%"></div></div>
       <div class="axis">
-        <span class="pole low">${f.low}</span>
-        <div class="track"><span class="marker" style="left:${m * 100}%">▼</span></div>
-        <span class="pole high">${f.high}</span>
+        <span class="pole low">${f.lowTag}</span>
+        <div class="track"><span class="marker" data-left="${m * 100}%"></span></div>
+        <span class="pole high">${f.highTag}</span>
       </div>
     </div>`;
   };
@@ -314,6 +341,10 @@ function renderFeatures(r) {
   btn.onclick = () => {
     $('feature-list').innerHTML = order.map(row).join('');
     btn.hidden = true;
+    requestAnimationFrame(() => {
+      document.querySelectorAll('.feat-fill').forEach((el) => { el.style.width = el.dataset.w; });
+      document.querySelectorAll('.marker').forEach((el) => { el.style.left = el.dataset.left; });
+    });
   };
 }
 
@@ -321,20 +352,24 @@ async function copyResult(r) {
   const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]).slice(0, 3);
   const text = [
     '【顔の好み診断】',
-    `タイプ: ${typeName(r)}`,
-    `重視した特徴: ${order.map((i) => `${FEATURES[i].name}(${Math.round(r.importance[i] * 100)}%)`).join(' / ')}`,
-    `好みの一貫性: ${Math.round((r.loo ?? r.trainAccuracy) * 100)}%（${r.rounds}回の選択）`,
+    `私のタイプ → ${typeName(r)}`,
+    order.map((i) => `${FEATURES[i].name} ${Math.round(r.importance[i] * 100)}%`).join(' / '),
+    `一貫性 ${Math.round((r.loo ?? r.trainAccuracy) * 100)}%（${r.rounds}回）`,
   ].join('\n');
   try {
     await navigator.clipboard.writeText(text);
-    $('btn-copy').textContent = 'コピーしました';
+    $('btn-copy').innerHTML = `${icon('check')}<span>コピーしました</span>`;
   } catch {
-    $('btn-copy').textContent = 'コピーできませんでした';
+    $('btn-copy').innerHTML = `<span>コピーできませんでした</span>`;
   }
-  setTimeout(() => { $('btn-copy').textContent = '結果をコピー'; }, 1800);
+  setTimeout(() => { $('btn-copy').innerHTML = `${icon('copy')}<span>結果をコピー</span>`; }, 1800);
 }
 
 /* ---------------- 入力 ---------------- */
+$('vs').innerHTML = icon('heartFill');
+document.querySelectorAll('.burst').forEach((b) => { b.innerHTML = icon('heartFill'); });
+$('btn-undo').innerHTML = icon('undo');
+$('btn-skip').innerHTML = `${icon('skip')}<span>どちらもピンとこない</span>`;
 document.querySelectorAll('.face-card').forEach((card) => {
   card.addEventListener('click', () => choose(Number(card.dataset.side)));
 });
