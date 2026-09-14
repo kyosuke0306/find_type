@@ -75,7 +75,12 @@ code {
 .hero-heart { transform-origin: 120px 66px; animation: beat 1.6s ease-in-out infinite; }
 @keyframes beat { 0%,100% { transform: scale(1); } 18% { transform: scale(1.18); } 36% { transform: scale(1); } 54% { transform: scale(1.1); } }
 
-.logo { font-size: 1.55rem; text-align: center; margin: 10px 0 2px; letter-spacing: .02em; }
+.logo {
+  font-size: 2rem; text-align: center; margin: 8px 0 2px;
+  letter-spacing: -.01em; font-weight: 800;
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
+.logo span { color: var(--accent); }
 .lead { color: var(--ink-dim); text-align: center; margin: 0 0 18px; font-size: .92rem; }
 .dim { color: var(--ink-dim); font-size: .85rem; }
 

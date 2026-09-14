@@ -3,10 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>顔の好み診断</title>
+<title>FaceMatch｜顔の好み診断</title>
 <meta name="description" content="2枚の顔から好きなほうを選ぶだけ。繰り返すと、どんな顔がタイプかが見えてきます。">
+<meta name="theme-color" content="#f7f3ef">
 <link rel="stylesheet" href="styles.css">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>👀</text></svg>">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192">
+<!-- ホーム画面に追加したときのアイコンと名前（iOS はマニフェストではなくこちらを見る） -->
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="FaceMatch">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 </head>
 <body>
 <main id="app">
@@ -17,7 +25,7 @@
 
   <!-- 顔画像が足りないとき -->
   <section id="screen-setup-needed" class="screen" hidden>
-    <h1 class="logo">顔の好み診断</h1>
+    <h1 class="logo">Face<span>Match</span></h1>
     <div class="card note">
       <h2>顔画像を用意してください</h2>
       <p class="dim" id="setup-reason"></p>
@@ -32,7 +40,7 @@
   <!-- スタート -->
   <section id="screen-start" class="screen" hidden>
     <div class="hero" id="hero"></div>
-    <h1 class="logo">顔の好み診断</h1>
+    <h1 class="logo">Face<span>Match</span></h1>
     <p class="lead">好きなほうを選ぶだけ</p>
 
     <div class="card">
