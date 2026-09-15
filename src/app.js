@@ -1,8 +1,8 @@
 // 画面遷移と診断の進行。推定そのものは model.js、特徴の定義は features.js にある。
 
 import { FEATURES, KEYS, normalizePool, cuteScore } from './features.js';
-import { partShares, faceMapSvg } from './facemap.js';
-import { fit, choosePair, updateStats, newStats, score, looAccuracy } from './model.js';
+import { partShares } from './facemap.js';
+import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -27,6 +27,7 @@ const state = {
   shown: 0,          // 出したペアの数（無限に続かないようにするため）
   pair: null,
   next: null,        // 先に決めて読み込んでおいた次のペア
+  locked: false,     // 判定に効く組み合わせ（スキップ不可）
   history: [],       // { a, b, winner, skipped }
   stats: newStats(),
   model: null,
@@ -140,6 +141,11 @@ function startSession() {
 // 選んだあとの演出の長さ。この間に次の顔を読み込む。
 const PICK_MS = 420;
 
+// この値を超える組み合わせはスキップさせない。
+// 判定が動く場面で飛ばされると、その分だけ結果の裏づけが薄くなる。
+// 45問のうち2割ほどが該当する（test/simulate.mjs で分布を見て決めた）。
+const SKIP_LOCK = 0.38;
+
 // 次に出すペアを決める。序盤はモデルが当てにならないので、
 // 推定を使い始めるのは数回たってから。
 function decidePair() {
@@ -190,6 +196,13 @@ async function showPair() {
   $('progress-fill').style.width = `${(state.round / state.rounds) * 100}%`;
   $('btn-undo').disabled = state.history.length === 0;
 
+  // 判定に効く組み合わせではスキップを閉じる。
+  // 推定が始まる前は「効く組み合わせ」を判断できないので閉じない。
+  const model = state.history.filter((h) => !h.skipped).length >= 6 ? state.model : null;
+  state.locked = !!model && pairValue(a, b, model, state.stats) >= SKIP_LOCK;
+  $('btn-skip').disabled = state.locked;
+  $('skip-lock').hidden = !state.locked;
+
   const img0 = $('img-0'), img1 = $('img-1');
   img0.src = a.src;
   img1.src = b.src;
@@ -226,7 +239,7 @@ function choose(side) {
 }
 
 function skip() {
-  if (state.busy || !state.pair) return;
+  if (state.busy || state.locked || !state.pair) return;
   const [a, b] = state.pair;
   // スキップは好みの情報にならないので記録せず、回数にも数えない。
   // 数えてしまうと、画面に出している精度（答えた回数に対する値）より
@@ -387,7 +400,6 @@ function renderStyle(r) {
 /** 顔のどこを見て決めているか。顔の絵とパーツ別の割合で見せる */
 function renderFaceMap(r) {
   const shares = partShares(r.importance);
-  $('facemap-art').innerHTML = faceMapSvg(shares);
   $('facemap-list').innerHTML = shares.map((p, n) => `
     <li style="--i:${n}">
       <span class="fm-name">${p.name}</span>
@@ -458,12 +470,16 @@ async function copyResult(r) {
 }
 
 /* ---------------- 入力 ---------------- */
-$('vs').innerHTML = icon('heartFill', { cls: 'is-heart' });
+$('vs').textContent = 'VS';
 document.querySelectorAll('.burst').forEach((b) => { b.innerHTML = icon('heartFill', { cls: 'is-heart' }); });
 $('btn-undo').innerHTML = icon('undo');
 $('btn-skip').innerHTML = `${icon('skip')}<span>どちらもピンとこない</span>`;
 document.querySelectorAll('.face-card').forEach((card) => {
-  card.addEventListener('click', () => choose(Number(card.dataset.side)));
+  card.addEventListener('click', () => {
+    // タップで得たフォーカスを残さない。次の組で選択済みのように見えてしまう。
+    card.blur();
+    choose(Number(card.dataset.side));
+  });
 });
 $('btn-skip').onclick = skip;
 $('btn-undo').onclick = undo;

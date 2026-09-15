@@ -173,6 +173,24 @@ export function choosePair(faces, model, stats, rand = Math.random, keys = KEYS,
   return rand() < 0.5 ? best : [best[1], best[0]];
 }
 
+/**
+ * この組み合わせが傾向の判定にどれだけ効くか（0..1）。
+ * まだ十分見ていない特徴で差が大きく、かつ予測が五分に近いほど高い。
+ * 五分に近いということは、どちらを選ぶかで推定が動くということ。
+ */
+export function pairValue(A, B, model, stats, keys = KEYS) {
+  const count = stats?.count ?? new Map();
+  let num = 0, den = 0;
+  for (const k of keys) {
+    const w = 1 / Math.pow(1 + (count.get(k) ?? 0), 0.8);
+    num += Math.abs(A.v[k] - B.v[k]) * w;
+    den += w;
+  }
+  const novelty = den ? num / den : 0;
+  const p = model ? predict(model, A.v, B.v, keys) : 0.5;
+  return novelty * (1 - Math.abs(p - 0.5) * 2);
+}
+
 export const pairId = (a, b) => (a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`);
 
 /** choosePair 用の統計を更新する */

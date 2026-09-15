@@ -75,7 +75,10 @@
       <span class="arena-loader" aria-hidden="true"><i></i><i></i><i></i></span>
     </div>
 
-    <button id="btn-skip" class="btn btn-ghost btn-block btn-icon"></button>
+    <div class="skip-wrap">
+      <button id="btn-skip" class="btn btn-ghost btn-block btn-icon"></button>
+      <p class="skip-lock" id="skip-lock" hidden>ここは判定に効くので選んでください</p>
+    </div>
   </section>
 
   <!-- 結果 -->
@@ -102,10 +105,7 @@
 
     <div class="card reveal" style="--i:2">
       <h2 class="card-title" id="t-where"></h2>
-      <div class="facemap">
-        <div class="facemap-art" id="facemap-art"></div>
-        <ul class="facemap-list" id="facemap-list"></ul>
-      </div>
+      <ul class="facemap-list" id="facemap-list"></ul>
     </div>
 
     <div class="card reveal" style="--i:3">
