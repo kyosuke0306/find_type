@@ -204,6 +204,7 @@ async function showPair() {
   state.locked = !!model && pairValue(a, b, model, state.stats) >= SKIP_LOCK;
   $('btn-skip').disabled = state.locked;
   $('skip-lock').hidden = !state.locked;
+  arena.classList.toggle('is-locked', state.locked);
 
   const img0 = $('img-0'), img1 = $('img-1');
   img0.src = a.src;
@@ -280,6 +281,7 @@ async function finishSession() {
   // 集計は重く、その間ブラウザは何も描けない。
   // 先に読み込み表示を出し、実際に描かれてから計算を始める。
   $('arena').classList.add('is-loading');
+  $('arena').classList.remove('is-locked');
   $('btn-skip').disabled = true;
   $('skip-lock').hidden = true;
   await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));

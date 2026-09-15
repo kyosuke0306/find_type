@@ -11,6 +11,7 @@
   --accent-soft: #e5ecf8;
   --accent-2: #7d9ad6;
   --heart: #ec5f8e;
+  --danger: #e11d48;
   --radius: 18px;
   --shadow: 0 1px 2px rgba(20,30,60,.06), 0 10px 30px rgba(20,30,60,.09);
 }
@@ -27,6 +28,7 @@
     --accent-soft: #222d47;
     --accent-2: #4f6cb0;
     --heart: #f47da8;
+    --danger: #fb4a6d;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.45);
   }
 }
@@ -58,9 +60,13 @@ code {
 @keyframes screenIn { from { opacity: 0; transform: translateY(14px); } }
 
 .skip-lock {
-  margin: 6px 0 0; text-align: center; font-size: .78rem; color: var(--ink-dim);
-  animation: pop .4s cubic-bezier(.2,1.3,.4,1) both;
+  margin: 8px 0 0; text-align: center;
+  font-size: .8rem; font-weight: 800; letter-spacing: .22em;
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  color: var(--danger);
+  animation: pop .4s cubic-bezier(.2,1.3,.4,1) both, lockBeat 1.1s ease-in-out .4s infinite;
 }
+@keyframes lockBeat { 50% { opacity: .68; } }
 .loader { display: flex; gap: 8px; justify-content: center; padding: 80px 0; }
 .loader span {
   width: 10px; height: 10px; border-radius: 50%; background: var(--accent);
@@ -110,7 +116,11 @@ code {
   font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
 }
 .logo span { color: var(--accent); }
-.lead { color: var(--ink-dim); text-align: center; margin: 0 0 18px; font-size: .92rem; }
+.lead {
+  color: var(--ink-dim); text-align: center; margin: 0 0 18px;
+  font-size: .95rem; letter-spacing: .01em;
+  font-family: "Avenir Next", "Segoe UI", system-ui, sans-serif;
+}
 .dim { color: var(--ink-dim); font-size: .85rem; }
 
 .card {
@@ -182,6 +192,15 @@ code {
 .play-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 9px; font-size: .85rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
 
 .arena { position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.arena.is-locked::before {
+  content: ""; position: absolute; inset: -13px; border-radius: 27px;
+  border: 3px solid var(--danger); pointer-events: none; z-index: 3;
+  box-shadow: 0 0 0 1px rgba(225,29,72,.22), 0 0 30px rgba(225,29,72,.6),
+              inset 0 0 26px rgba(225,29,72,.22);
+  animation: lockRing .45s cubic-bezier(.2,.9,.3,1) both, lockBeat 1.1s ease-in-out .45s infinite;
+}
+@keyframes lockRing { from { opacity: 0; transform: scale(1.05); } }
+.arena.is-locked .face-card { border-color: var(--danger); }
 .face-card {
   position: relative; padding: 0; border: 3px solid transparent; background: var(--card);
   border-radius: var(--radius); overflow: hidden; cursor: pointer; box-shadow: var(--shadow);
