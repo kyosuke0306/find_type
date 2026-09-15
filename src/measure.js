@@ -189,9 +189,35 @@ export function measurePixels(px, W, H, geo, stride = 3) {
   // 十分大きければ見分けられる（暗い髪 × 明るい背景など）。
   // 照明でうっすら濃淡のある背景を弾かないよう、その関係で判定する。
   const hairBgGap = hair ? dist(hair, bg) : 0;
-  const plainBg = agree.length >= 3 && (bgSpread < 70 || bgSpread * 2 < hairBgGap);
+  const plainBgRgb = agree.length >= 3 && (bgSpread < 70 || bgSpread * 2 < hairBgGap);
   // 背景を除外するときの許容幅。ムラのぶんだけ広げるが、髪まで飲み込まない範囲に留める。
   const bgTol = bgSpread < 70 ? 70 : Math.min(bgSpread + 20, Math.max(70, hairBgGap * 0.5));
+
+  // 明るさを捨てた「色味」でも見分けを試す。
+  //
+  // 生成画像の背景は上から下へ暗くなっていることが多い。このムラは RGB を
+  // ほぼ一様に上下させるだけなので、明るさを割り算で落とすと消える。
+  // 一方、灰色の背景（R≒G≒B）と茶色い髪（R>G>B）は色味では大きく離れる。
+  // 実例: 髪(168,138,120) と背景(178,182,186) は RGB 距離だと 80 しかなく、
+  // 背景のムラ 79 に埋もれて計測できなかったが、色味の距離は 0.069 あり、
+  // 背景のムラ 0.005 の10倍以上ある。
+  //
+  // 逆に黒髪は色味が灰色に近いので、こちらでは分けられない。
+  // その場合は明るさの差が大きいので RGB の判定が効く。両方あって初めて広く測れる。
+  const chroma = (c) => { const s = c.r + c.g + c.b || 1; return { x: c.r / s, y: c.g / s }; };
+  const cdist = (a, b) => {
+    const p = chroma(a), q = chroma(b);
+    return Math.hypot(p.x - q.x, p.y - q.y);
+  };
+  const bgSpreadC = agree.length ? Math.max(...agree.map((c) => cdist(c, bg))) : 999;
+  const hairBgGapC = hair ? cdist(hair, bg) : 0;
+  // 色味の差が小さいまま比だけ満たしても意味がないので、絶対値の下限も置く。
+  const CHROMA_MIN = 0.010;
+  const plainBgChroma = agree.length >= 3 && Boolean(hair)
+    && hairBgGapC > CHROMA_MIN && bgSpreadC * 2 < hairBgGapC;
+  const plainBg = plainBgRgb || plainBgChroma;
+  // 色味で見分けるときの許容幅。RGB で無地と言えるときは、これまで通り RGB で判定する。
+  const bgTolC = Math.min(bgSpreadC + 0.004, hairBgGapC * 0.5);
 
   // 髪の長さ: あごの下に向かって行ごとに走査し、髪がどこまで伸びているかを両目間距離で測る。
   //
@@ -206,6 +232,14 @@ export function measurePixels(px, W, H, geo, stride = 3) {
   const hy1 = Math.min(H, Math.round(chin.y + MAX_DEPTH * d));
   const availDepth = (hy1 - hy0) / d;
 
+  // 背景かどうかの判定。RGB で無地と言えるならこれまで通り。
+  // 言えないが色味では分かれているときだけ、色味で判定する。
+  // 髪と肌の見分けは明るさの差が要るので、そこは RGB のまま。
+  const pxColor = (i) => ({ r: px[i], g: px[i + 1], b: px[i + 2] });
+  const isBg = plainBgRgb
+    ? (i) => near(i, bg, bgTol)
+    : (i) => cdist(pxColor(i), bg) < bgTolC;
+
   let lastHairRow = -1;
   if (hair && plainBg && hx1 > hx0) {
     for (let y = hy0; y < hy1; y++) {
@@ -213,7 +247,7 @@ export function measurePixels(px, W, H, geo, stride = 3) {
       for (let x = hx0; x < hx1; x++) {
         n++;
         const i = (y * W + x) * stride;
-        if (near(i, hair, 110) && !near(i, bg, bgTol) && !near(i, skin, 80)) c++;
+        if (near(i, hair, 110) && !isBg(i) && !near(i, skin, 80)) c++;
       }
       if (n && c / n >= ROW_MIN) lastHairRow = y;
     }
@@ -231,11 +265,13 @@ export function measurePixels(px, W, H, geo, stride = 3) {
     const sx = Math.max(0, Math.round(eyeMid.x - 1.7 * d));
     const ex = Math.min(W, Math.round(eyeMid.x + 1.7 * d));
     const limit = Math.min(H, Math.round(eyeMid.y));
+    // 頭頂も同じ理由で、RGB で無地と言えないときは色味で背景を判定する
+    const bgHere = plainBgRgb ? (i) => near(i, bg, 70) : (i) => cdist(pxColor(i), bg) < bgTolC;
     outer: for (let y = 0; y < limit; y++) {
       let run = 0;
       for (let x = sx; x < ex; x++) {
         const i = (y * W + x) * stride;
-        if (!near(i, bg, 70)) { if (++run >= 4) { headTop = y; break outer; } } else run = 0;
+        if (!bgHere(i)) { if (++run >= 4) { headTop = y; break outer; } } else run = 0;
       }
     }
   }
@@ -246,6 +282,6 @@ export function measurePixels(px, W, H, geo, stride = 3) {
     hairLength: measurable ? extent : null,                 // あご下に伸びている長さ（両目間距離を1とする）
     _skin: skin, _hair: hair, _bg: bg, _hairProbe: hairProbe,
     _scan: { x0: hx0, x1: hx1, y0: hy0, y1: hy1, yHair: lastHairRow },
-    _plainBg: plainBg, _availDepth: availDepth, _censored: censored, _headTop: headTop,
+    _plainBg: plainBg, _plainBgRgb: plainBgRgb, _plainBgChroma: plainBgChroma, _availDepth: availDepth, _censored: censored, _headTop: headTop,
   };
 }

@@ -98,7 +98,7 @@ function buildStartScreen() {
 
   // 精度は同梱プールでの実測値（node test/simulate.mjs <問数> 120 --pool data/faces.json）
   $('rounds-choices').innerHTML = [
-    { v: 20, label: 'さくっと', acc: 82 },
+    { v: 20, label: 'さくっと', acc: 80 },
     { v: 30, label: 'おすすめ', acc: 84 },
     { v: 45, label: 'しっかり', acc: 87 },
     { v: 90, label: 'とことん', acc: 90 },
