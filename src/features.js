@@ -23,6 +23,11 @@ export const FEATURES = [
 ];
 
 export const KEYS = FEATURES.map((f) => f.key);
+
+// このアプリで知りたいのは顔のパーツの好み。
+// 髪と肌は「顔」ではないので、結果では分けて扱う。
+export const LOOK_KEYS = ['skinTone', 'hairColor', 'hairLength'];
+export const FACE_KEYS = KEYS.filter((k) => !LOOK_KEYS.includes(k));
 export const FEATURE_BY_KEY = Object.fromEntries(FEATURES.map((f) => [f.key, f]));
 
 // 実測のばらつき（tools/noise-check.mjs で測った値）。

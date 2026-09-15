@@ -1,6 +1,6 @@
 // 画面遷移と診断の進行。推定そのものは model.js、特徴の定義は features.js にある。
 
-import { FEATURES, KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
+import { FEATURES, KEYS, FACE_KEYS, LOOK_KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
 import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue } from './model.js';
 import { icon, featureIcon } from './icons.js';
@@ -328,12 +328,12 @@ function typeName(r) {
   const tags = [];
   for (const i of order) {
     if (tags.length >= 3) break;
-    if (!usable.has(KEYS[i])) continue;
+    if (!usable.has(KEYS[i]) || !FACE_KEYS.includes(KEYS[i])) continue;
     if (r.importance[i] < 0.085 || (r.support?.[i] ?? 0) < 3) continue;
     const f = FEATURES[i], m = r.m[i];
     tags.push(m > 0.62 ? f.highTag : m < 0.38 ? f.lowTag : `中間の${f.name}`);
   }
-  return tags.length ? tags.join(' × ') : 'こだわり少なめのオールラウンド';
+  return tags.length ? tags.join(' × ') : '顔のパーツにはこだわり少なめ';
 }
 
 function renderResult(r) {
@@ -343,8 +343,9 @@ function renderResult(r) {
   // 上位項目をタグで見せる（説明文の代わり）。
   // 重視度がほぼ0の項目を並べても意味がないので、目立つものだけ出す。
   const usable = usableOf(r);
-  const shown = order.filter((i) => usable.has(KEYS[i]) && r.importance[i] >= 0.05).slice(0, 3);
-  const fallback = order.filter((i) => usable.has(KEYS[i])).slice(0, 1);
+  const isFace = (i) => usable.has(KEYS[i]) && FACE_KEYS.includes(KEYS[i]);
+  const shown = order.filter((i) => isFace(i) && r.importance[i] >= 0.05).slice(0, 3);
+  const fallback = order.filter(isFace).slice(0, 1);
   $('result-tags').innerHTML = (shown.length ? shown : fallback).map((i, n) =>
     `<span class="tag" style="--i:${n}">${featureIcon(KEYS[i])}${FEATURES[i].name}
        <b>${Math.round(r.importance[i] * 100)}%</b></span>`).join('');
@@ -352,7 +353,8 @@ function renderResult(r) {
   $('t-top').innerHTML = `${icon('crown')}好みに近い顔`;
   $('t-style').innerHTML = `${icon('sparkle')}きれい系 or かわいい系`;
   $('t-where').innerHTML = `${featureIcon('eyeSize')}どこを見て決めているか`;
-  $('t-feat').innerHTML = `${icon('chart')}効いていた特徴`;
+  $('t-feat').innerHTML = `${icon('chart')}効いていた顔のパーツ`;
+  $('t-look').innerHTML = `${featureIcon('hairLength')}髪と肌`;
   $('t-chosen').innerHTML = `${icon('heart', { cls: 'is-heart' })}選んだ顔 <span class="card-note">${r.chosen.length}枚</span>`;
 
   const srcOf = (id) => state.byId.get(id)?.src ?? '';
@@ -434,23 +436,24 @@ function renderFaceMap(r) {
 
 function renderFeatures(r) {
   const can = usableOf(r);
-  const order = KEYS.map((_, i) => i).sort((a, b) => {
+  // 顔のパーツの中での割合に直す。髪と肌を混ぜると、顔の項目がどれも
+  // 数%に見えて読み取れなくなるため。
+  const faceTotal = FACE_KEYS.reduce((s, k) => s + (can.has(k) ? r.importance[KEYS.indexOf(k)] : 0), 0) || 1;
+  const share = (i) => r.importance[i] / faceTotal;
+
+  const order = FACE_KEYS.map((k) => KEYS.indexOf(k)).sort((a, b) => {
     const ua = can.has(KEYS[a]) ? 1 : 0, ub = can.has(KEYS[b]) ? 1 : 0;
     if (ua !== ub) return ub - ua;           // 判定できる項目を先に
     return r.importance[b] - r.importance[a];
   });
-  const max = Math.max(...KEYS.map((k, i) => (can.has(k) ? r.importance[i] : 0)), 1e-6);
-  // 重視度が低くても上位6件は必ず見せる（1項目だけだと結果が読み取りにくいため）
-  const nStrong = Math.max(6, order.filter((i) => can.has(KEYS[i]) && r.importance[i] >= 0.05).length);
-  const strong = order.slice(0, nStrong);
-  const weak = order.slice(nStrong);
+  const max = Math.max(...order.map((i) => (can.has(KEYS[i]) ? share(i) : 0)), 1e-6);
+  const nStrong = Math.max(6, order.filter((i) => can.has(KEYS[i]) && share(i) >= 0.05).length);
 
-  const usable = usableOf(r);
   const row = (i, n) => {
-    const f = FEATURES[i], m = r.m[i], imp = r.importance[i];
+    const f = FEATURES[i], m = r.m[i], v = share(i);
     // 同梱の顔どうしで差が小さい項目は、値が出ても根拠がない。
     // 隠さずに「判定できない」と書いて区別する。
-    if (!usable.has(f.key)) {
+    if (!can.has(f.key)) {
       return `<div class="feat is-unmeasurable" style="--i:${n}">
         <div class="feat-head">
           ${featureIcon(f.key)}
@@ -460,13 +463,13 @@ function renderFeatures(r) {
         <p class="card-note">同梱の顔どうしで差が小さく、好みを読み取れません</p>
       </div>`;
     }
-    return `<div class="feat${imp < 0.05 ? ' is-weak' : ''}" style="--i:${n}">
+    return `<div class="feat${v < 0.05 ? ' is-weak' : ''}" style="--i:${n}">
       <div class="feat-head">
         ${featureIcon(f.key)}
         <span class="feat-name">${f.name}</span>
-        <span class="feat-pct">${Math.round(imp * 100)}%</span>
+        <span class="feat-pct">${Math.round(v * 100)}%</span>
       </div>
-      <div class="feat-bar"><div class="feat-fill" data-w="${(imp / max) * 100}%"></div></div>
+      <div class="feat-bar"><div class="feat-fill" data-w="${(v / max) * 100}%"></div></div>
       <div class="axis">
         <span class="pole low">${f.lowTag}</span>
         <div class="track"><span class="marker" data-left="${m * 100}%"></span></div>
@@ -475,23 +478,70 @@ function renderFeatures(r) {
     </div>`;
   };
 
-  $('feature-list').innerHTML = strong.map(row).join('');
+  $('feature-list').innerHTML = order.slice(0, nStrong).map(row).join('');
   const btn = $('btn-show-rest');
-  btn.hidden = weak.length === 0;
+  btn.hidden = order.length <= nStrong;
   btn.onclick = () => {
     $('feature-list').innerHTML = order.map(row).join('');
     btn.hidden = true;
-    requestAnimationFrame(() => {
-      document.querySelectorAll('.feat-fill').forEach((el) => { el.style.width = el.dataset.w; });
-      document.querySelectorAll('.marker').forEach((el) => { el.style.left = el.dataset.left; });
-    });
+    replay();
   };
+
+  renderLook(r, can);
 }
+
+/** 髪と肌。顔のパーツとは別扱いにする */
+function renderLook(r, can) {
+  const all = r.importance.reduce((s, x) => s + x, 0) || 1;
+  const lookTotal = LOOK_KEYS.reduce((s, k) => s + r.importance[KEYS.indexOf(k)], 0);
+  const pct = Math.round((lookTotal / all) * 100);
+  $('look-note').textContent = pct >= 50
+    ? `顔のパーツより、髪と肌のほうを見て選んでいます（全体の ${pct}%）`
+    : `選ぶときの ${pct}% は髪と肌で決まっていました`;
+
+  const lookMax = Math.max(...LOOK_KEYS.map((k) => (can.has(k) ? r.importance[KEYS.indexOf(k)] : 0)), 1e-6);
+  $('look-list').innerHTML = LOOK_KEYS
+    .map((k) => KEYS.indexOf(k))
+    .sort((a, b) => r.importance[b] - r.importance[a])
+    .map((i, n) => {
+      const f = FEATURES[i], m = r.m[i], imp = r.importance[i];
+      if (!can.has(f.key)) {
+        return `<div class="feat is-unmeasurable" style="--i:${n}">
+          <div class="feat-head">${featureIcon(f.key)}<span class="feat-name">${f.name}</span>
+          <span class="feat-note">判定できません</span></div></div>`;
+      }
+      return `<div class="feat" style="--i:${n}">
+        <div class="feat-head">
+          ${featureIcon(f.key)}
+          <span class="feat-name">${f.name}</span>
+          <span class="feat-pct">${Math.round((imp / all) * 100)}%</span>
+        </div>
+        <div class="feat-bar"><div class="feat-fill" data-w="${(imp / lookMax) * 100}%"></div></div>
+        <div class="axis">
+          <span class="pole low">${f.lowTag}</span>
+          <div class="track"><span class="marker" data-left="${m * 100}%"></span></div>
+          <span class="pole high">${f.highTag}</span>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+/** バーとマーカーを動かす */
+function replay() {
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.feat-fill, .fm-fill').forEach((el) => { el.style.width = el.dataset.w; });
+    document.querySelectorAll('.marker, .style-marker').forEach((el) => { el.style.left = el.dataset.left; });
+  });
+}
+
 
 async function copyResult(r) {
   const usable = usableOf(r);
-  const order = KEYS.map((_, i) => i).filter((i) => usable.has(KEYS[i]))
+  const all = r.importance.reduce((s, x) => s + x, 0) || 1;
+  const order = KEYS.map((_, i) => i)
+    .filter((i) => usable.has(KEYS[i]) && FACE_KEYS.includes(KEYS[i]))
     .sort((a, b) => r.importance[b] - r.importance[a]).slice(0, 3);
+  const lookPct = Math.round(LOOK_KEYS.reduce((s, k) => s + r.importance[KEYS.indexOf(k)], 0) / all * 100);
   const { score, basis } = cuteScore(r.m, r.importance, usable);
   const style = basis < 0.35 || Math.abs(score) < 0.12 ? 'どちらも同じくらい'
     : `${Math.abs(score) >= 0.45 ? 'はっきり' : 'どちらかといえば'}${score > 0 ? 'かわいい系' : 'きれい系'}`;
@@ -502,6 +552,7 @@ async function copyResult(r) {
     `系統 → ${style}`,
     `よく見ている → ${parts.map((p) => `${p.name} ${Math.round(p.share * 100)}%`).join(' / ')}`,
     order.map((i) => `${FEATURES[i].name} ${Math.round(r.importance[i] * 100)}%`).join(' / '),
+    `髪と肌 ${lookPct}%`,
     `一貫性 ${Math.round((r.loo ?? r.trainAccuracy) * 100)}%（${r.rounds}回）`,
   ].join('\n');
   try {

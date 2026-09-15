@@ -3,14 +3,14 @@
 
 import { KEYS } from './features.js';
 
+// 顔のパーツだけ。髪と肌はこのアプリの関心ではないので入れない。
 export const FACE_PARTS = [
-  { id: 'eyes',    name: '目',        keys: ['eyeSize', 'eyeTilt', 'eyeDistance'] },
-  { id: 'brows',   name: '眉',        keys: ['browEyeGap', 'browAngle', 'browArch'] },
-  { id: 'outline', name: '輪郭',      keys: ['faceLength', 'jawSharp'] },
-  { id: 'mouth',   name: '口もと',    keys: ['mouthWidth', 'lipThick'] },
-  { id: 'nose',    name: '鼻',        keys: ['noseWidth'] },
-  { id: 'hair',    name: '髪',        keys: ['hairColor', 'hairLength'] },
-  { id: 'skin',    name: '肌・雰囲気', keys: ['skinTone', 'ageLook'] },
+  { id: 'eyes',    name: '目',      keys: ['eyeSize', 'eyeTilt', 'eyeDistance'] },
+  { id: 'brows',   name: '眉',      keys: ['browEyeGap', 'browAngle', 'browArch'] },
+  { id: 'outline', name: '輪郭',    keys: ['faceLength', 'jawSharp'] },
+  { id: 'mouth',   name: '口もと',  keys: ['mouthWidth', 'lipThick'] },
+  { id: 'nose',    name: '鼻',      keys: ['noseWidth'] },
+  { id: 'impression', name: '顔立ち', keys: ['ageLook'] },
 ];
 
 /**
