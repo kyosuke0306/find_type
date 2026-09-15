@@ -143,18 +143,21 @@ const STRONG_PHRASES = {
 // 顔の「型」。パーツを個別に指定しても生成器は動かない
 // （「細い目」と書いても、かわいい顔の正解値から離れない）。
 // 型ごと指定すると顔全体の骨格が入れ替わるので、かわいさを保ったまま散らせる。
-// どれも「かわいい／きれい」の範囲にある、日本で通じる顔の型を並べている。
+//
+// 並べるのは「かわいい」の範囲にある型だけにする。
+// 狐顔・クール系・彫り深めも骨格は散るが、きれい系であってかわいくはない。
+// 目的2（かわいい人を見て楽しむ）から外れるので入れない。
 const ARCHETYPES = [
-  { ja: 'たぬき顔', en: 'the tanuki type — a round soft baby face, large round eyes set slightly wide apart, full rounded cheeks, a small button nose' },
-  { ja: '猫顔',     en: 'the cat type — a small slim face, sharply upturned almond eyes, a pointed chin, thin defined lips' },
-  { ja: '狐顔',     en: 'the fox type — a long slender face, narrow slanted eyes, a high thin nose bridge, a sharp jawline' },
-  { ja: '犬顔',     en: 'the puppy type — a soft rounded face, gently downturned large eyes, a small rounded nose, a short lower face' },
-  { ja: '童顔',     en: 'the baby-faced type — a very short lower face, a high forehead, large round eyes sitting low, full soft cheeks' },
-  { ja: '正統派美人', en: 'the classic beauty type — a well-balanced oval face, calm almond eyes, a straight slender nose, softly arched eyebrows' },
-  { ja: 'クール系', en: 'the cool beauty type — a long narrow face, upturned narrow eyes, straight flat eyebrows, thin lips, a sharp chin' },
-  { ja: 'おっとり系', en: 'the gentle type — a wide soft face, wide-set gentle downturned eyes, a small low nose, full plump lips' },
-  { ja: '韓国アイドル風', en: 'the K-pop idol type — a very small face, straight flat eyebrows, large glassy eyes, a small pointed chin, a low soft nose' },
-  { ja: '彫り深め', en: 'the deep-featured type — deep-set eyes under a defined brow ridge, a high straight nose, a defined jawline' },
+  { ja: 'たぬき顔',   en: 'the tanuki type — a round soft face, large round eyes set a little wide apart, a small button nose, a small neat mouth' },
+  { ja: '犬顔',       en: 'the puppy type — a softly rounded face, large gently downturned eyes, a small rounded nose, a short lower face' },
+  { ja: '猫顔',       en: 'the cat type — a small slim face, upturned almond eyes, a neatly pointed chin, a small well-shaped mouth' },
+  { ja: 'うさぎ顔',   en: 'the rabbit type — a small delicate face, very large round glossy eyes, a slim short nose, a tiny mouth' },
+  { ja: '童顔',       en: 'the baby-faced type — a short lower face, large round eyes sitting low, soft smooth cheeks, a small rounded chin' },
+  { ja: '韓国アイドル風', en: 'the K-pop idol type — a very small face, soft straight eyebrows, large glassy double-eyelid eyes, a small pointed chin' },
+  { ja: 'ハーフ顔',   en: 'the half-Japanese looking type — large deep-set double-eyelid eyes, a high slender nose bridge, a small face' },
+  { ja: '儚げ系',     en: 'the delicate ethereal type — a slim fine-boned face, slightly downturned eyes, delicate thin lips, a fine straight nose' },
+  { ja: '大人かわいい', en: 'the grown-up cute type — a balanced oval face, calm almond double-eyelid eyes, a straight slender nose, softly arched eyebrows' },
+  { ja: 'ぱっちり丸顔', en: 'the round-faced doll type — a round face with a soft rounded jaw, very large round eyes, full plump lips' },
 ];
 
 /**
