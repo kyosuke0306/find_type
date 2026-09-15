@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-15T09:40:15.226Z",
-  "count": 28,
+  "generatedAt": "2026-09-15T09:45:06.471Z",
+  "count": 31,
   "faces": [
     {
       "id": "f01",
@@ -676,6 +676,84 @@
         "hairColor": 128.47973,
         "hairLength": 1.00559,
         "ageLook": 19.3275
+      }
+    },
+    {
+      "id": "n1",
+      "file": "f52.jpg",
+      "gender": "female",
+      "genderProbability": 1,
+      "detectedGender": "female",
+      "age": 19.2,
+      "detScore": 0.71,
+      "raw": {
+        "faceLength": 0.75467,
+        "jawSharp": -0.6487,
+        "eyeSize": 0.12544,
+        "eyeTilt": 0.03421,
+        "eyeDistance": 0.26845,
+        "browEyeGap": 0.31649,
+        "browAngle": -0.02677,
+        "browArch": 0.0967,
+        "noseWidth": 0.34595,
+        "mouthWidth": 0.74128,
+        "lipThick": 0.22051,
+        "skinTone": -83.72411,
+        "hairColor": 115.69795,
+        "hairLength": 1.17813,
+        "ageLook": 19.15594
+      }
+    },
+    {
+      "id": "n4",
+      "file": "f53.jpg",
+      "gender": "female",
+      "genderProbability": 1,
+      "detectedGender": "female",
+      "age": 21.9,
+      "detScore": 0.995,
+      "raw": {
+        "faceLength": 0.81165,
+        "jawSharp": -0.65858,
+        "eyeSize": 0.12854,
+        "eyeTilt": 0.03301,
+        "eyeDistance": 0.27704,
+        "browEyeGap": 0.34185,
+        "browAngle": -0.03204,
+        "browArch": 0.10438,
+        "noseWidth": 0.34193,
+        "mouthWidth": 0.76834,
+        "lipThick": 0.23762,
+        "skinTone": -64.14842,
+        "hairColor": 121.93918,
+        "hairLength": 0.91525,
+        "ageLook": 21.85607
+      }
+    },
+    {
+      "id": "n5",
+      "file": "f54.jpg",
+      "gender": "female",
+      "genderProbability": 1,
+      "detectedGender": "female",
+      "age": 20.3,
+      "detScore": 0.974,
+      "raw": {
+        "faceLength": 0.78568,
+        "jawSharp": -0.65184,
+        "eyeSize": 0.12812,
+        "eyeTilt": 0.03297,
+        "eyeDistance": 0.27587,
+        "browEyeGap": 0.33511,
+        "browAngle": -0.03157,
+        "browArch": 0.10643,
+        "noseWidth": 0.34378,
+        "mouthWidth": 0.73318,
+        "lipThick": 0.22807,
+        "skinTone": -86.994,
+        "hairColor": 141.28816,
+        "hairLength": 1.50862,
+        "ageLook": 20.30751
       }
     }
   ]
