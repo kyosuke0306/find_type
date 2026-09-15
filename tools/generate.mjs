@@ -23,10 +23,9 @@ const AXES = {
   hair: ['very short cropped hair', 'short hair above the ears', 'chin-length bob', 'shoulder-length hair', 'long hair past the chest'],
   hairColor: ['jet black hair', 'dark brown hair', 'light brown hair', 'ash grey hair', 'blonde hair'],
   skin: ['fair pale skin', 'light skin', 'medium olive skin', 'tan brown skin', 'deep brown skin'],
-  // 10代後半から30代まで。顔を好みで採点するアプリなので、
-  // 未成年にあたる年齢は生成しない（10代は18・19歳のみ）。
-  // 「顔立ちの印象」の軸を測るために、各年代に散らしている。
-  age: ['18 years old', '19 years old', '23 years old', '27 years old', '32 years old', '37 years old'],
+  // 18〜25歳。顔を好みで採点するアプリなので、未成年にあたる年齢は生成しない。
+  // 「顔立ちの印象」の軸を測るために、この幅の中で散らしている。
+  age: ['18 years old', '19 years old', '20 years old', '22 years old', '24 years old', '25 years old'],
 };
 
 const ETHNICITY = {
@@ -80,7 +79,7 @@ const FILL_PHRASES = {
   noseWidth:   ['a narrow slender nose', 'a wide nose with broad nostrils'],
   mouthWidth:  ['a small narrow mouth', 'a wide mouth'],
   lipThick:    ['very thin lips', 'very full plump lips'],
-  ageLook:     ['18 years old', '37 years old'],
+  ageLook:     ['18 years old, a very youthful girlish face', '25 years old, a composed grown-up face'],
   skinTone:    ['very fair porcelain skin', 'tanned skin'],
   hairColor:   ['jet black hair', 'dyed bleached blonde hair'],
   hairLength:  ['very short cropped hair', 'very long hair past the chest'],
