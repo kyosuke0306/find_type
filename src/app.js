@@ -93,10 +93,12 @@ function buildStartScreen() {
      </button>`).join('');
   if (options.length >= 2) bindChoices(genderBox, (v) => { state.gender = v; });
 
+  // 精度は同梱プールでの実測値（node test/simulate.mjs <問数> 120 --pool data/faces.json）
   $('rounds-choices').innerHTML = [
-    { v: 20, label: 'さくっと', acc: 78 },
-    { v: 30, label: 'おすすめ', acc: 83 },
-    { v: 45, label: 'じっくり', acc: 86 },
+    { v: 20, label: 'さくっと', acc: 81 },
+    { v: 30, label: 'おすすめ', acc: 84 },
+    { v: 45, label: 'しっかり', acc: 86 },
+    { v: 90, label: 'とことん', acc: 91 },
   ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
       <span class="big">${r.v}</span><span class="sub">${r.label}</span>
       <span class="acc">精度 ${r.acc}%</span></button>`).join('');
@@ -274,9 +276,17 @@ const comparisons = () => state.history.filter((h) => !h.skipped).map((h) => {
 });
 
 /* ---------------- 結果 ---------------- */
-function finishSession() {
+async function finishSession() {
+  // 集計は重く、その間ブラウザは何も描けない。
+  // 先に読み込み表示を出し、実際に描かれてから計算を始める。
+  $('arena').classList.add('is-loading');
+  $('btn-skip').disabled = true;
+  $('skip-lock').hidden = true;
+  await new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done)));
+
   const cs = comparisons();
   if (cs.length < 6) {
+    $('arena').classList.remove('is-loading');
     alert('スキップが多く、判定できるだけの選択が集まりませんでした。もう一度お試しください。');
     show('screen-start');
     return;
@@ -297,6 +307,7 @@ function finishSession() {
     chosen: state.history.filter((h) => !h.skipped).map((h) => h.winner),
   };
   try { localStorage.setItem(STORE_KEY, JSON.stringify(payload)); } catch { /* 容量超過は無視 */ }
+  $('arena').classList.remove('is-loading');
   renderResult(payload);
   show('screen-result');
 }

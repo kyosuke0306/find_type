@@ -117,15 +117,23 @@ export function accuracy(model, comparisons, keys = KEYS) {
  * Leave-one-out 交差検証。1件を除いて学習し、その1件を当てられるかを見る。
  * 学習データへの当てはまりではなく「次の選択を予測できるか」= 好みの一貫性。
  */
+// 1件ごとに学習し直すので件数が増えると重い。
+// 90問では総当たりだと画面が数秒止まるため、等間隔に間引く。
+// 平均を取る指標なので、間引いても値はほとんど変わらない。
+const MAX_FOLDS = 40;
+
 export function looAccuracy(comparisons, keys = KEYS, opts = {}) {
-  if (comparisons.length < 6) return null;
+  const n = comparisons.length;
+  if (n < 6) return null;
+  const folds = Math.min(n, MAX_FOLDS);
   let ok = 0;
-  for (let i = 0; i < comparisons.length; i++) {
+  for (let t = 0; t < folds; t++) {
+    const i = Math.floor((t * n) / folds);
     const rest = comparisons.filter((_, j) => j !== i);
     const mdl = fit(rest, keys, { iters: 350, ...opts });
     if (utilityDelta(mdl, comparisons[i].win, comparisons[i].lose, keys) > 0) ok++;
   }
-  return ok / comparisons.length;
+  return ok / folds;
 }
 
 /**
