@@ -1,12 +1,10 @@
 {
   "_note": "狙い（アイドル・女優くらいのかわいさ）から外れていて、枚数に余裕ができたら外したい顔。精度がしきい値を超えるまでは外さない。npm run trim-check で判定する。trials を少なくすると測定が±0.03ほどぶれて、誤差で削除してしまうため多めにしている。",
-  "threshold": { "metric": "acc", "value": 0.9, "rounds": 90, "trials": 200 },
-  "candidates": [
-    { "file": "f23.jpg", "why": "丸顔で素朴。かわいさの基準に届かない" },
-    { "file": "f25.jpg", "why": "大人っぽく、表情が硬い" },
-    { "file": "f31.jpg", "why": "眉が強く、きつい印象" },
-    { "file": "f39.jpg", "why": "素朴で、アイドル・女優の基準から遠い" },
-    { "file": "f41.jpg", "why": "ボーイッシュ。f40 と同一人物に見えた片割れ" },
-    { "file": "f46.jpg", "why": "大人っぽく、眉が強い" }
-  ]
+  "threshold": {
+    "metric": "acc",
+    "value": 0.9,
+    "rounds": 90,
+    "trials": 200
+  },
+  "candidates": []
 }
