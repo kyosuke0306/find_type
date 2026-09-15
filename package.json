@@ -12,7 +12,8 @@
     "noise-check": "node tools/noise-check.mjs",
     "find-duplicates": "node tools/find-duplicates.mjs",
     "coverage": "node tools/coverage.mjs",
-    "trim-check": "node tools/trim-check.mjs"
+    "trim-check": "node tools/trim-check.mjs",
+    "pick": "node tools/pick.mjs"
   },
   "devDependencies": {
     "@tensorflow/tfjs": "4.22.0",

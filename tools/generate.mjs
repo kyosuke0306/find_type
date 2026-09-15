@@ -161,6 +161,34 @@ const ARCHETYPES = [
 ];
 
 /**
+ * かわいさだけを指定するプロンプト。顔のパーツには一切触れない。
+ *
+ * 文章で骨格を動かそうとすると顔が崩れることが分かったので、
+ * 狙って散らすのはやめる。生成器が得意なこと（かわいい顔を作ること）
+ * だけをさせて、出てきたものの中から実測値が離れているものを選ぶ。
+ * 選ぶ側は tools/pick.mjs が行う。
+ */
+function buildPlainPrompts(n, opts) {
+  const rand = mulberry(opts.seed);
+  const vibe = VIBE[opts.vibe] ?? VIBE.idol;
+  const axes = opts.vibe === 'idol' ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES } : { ...AXES, ...EAST_ASIAN_AXES };
+  const hairBag = makeBag(axes.hair, rand);
+  const colorBag = makeBag(axes.hairColor, rand);
+  const ageBag = makeBag(AXES.age, rand);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    // 髪と年齢だけ振る。生成器はこの2つなら素直に従うし、顔も崩れない。
+    const variation = `Japanese woman, ${ageBag()}, ${hairBag()}, ${colorBag()}`;
+    out.push({
+      index: i, gender: 'woman', why: 'かわいさ最優先（顔の指定なし）',
+      variation,
+      text: `A ${FRAMING}. A ${vibe} ${variation}.`,
+    });
+  }
+  return out;
+}
+
+/**
  * 顔の型をひと通り作らせるプロンプト。
  * 型ごとに骨格が違うので、かわいさを保ったまま実測値が散る。
  */
@@ -312,7 +340,7 @@ function buildFillPrompts(targets, n, opts) {
 }
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, spread: false, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, spread: false, plain: false, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -323,6 +351,7 @@ function parseArgs(argv) {
     else if (k === '--vibe') a.vibe = argv[++i];
     else if (k === '--fill') a.fill = argv[++i] ?? 'data/faces.json';
     else if (k === '--spread') a.spread = true;
+    else if (k === '--plain') a.plain = true;
     else if (k === '--female-ratio') a.femaleRatio = Number(argv[++i]);
     else if (k === '--concurrency') a.concurrency = Number(argv[++i]);
     else if (k === '--seed') a.seed = Number(argv[++i]);
@@ -441,7 +470,13 @@ async function main() {
   }
 
   let prompts, fillNote = '';
-  if (args.spread) {
+  if (args.plain) {
+    prompts = buildPlainPrompts(args.count, args);
+    fillNote = 'かわいさだけを指定しています。顔のパーツは指定しません。'
+      + '出来たものを取り込んだあと npm run pick で残す顔を選びます。';
+    console.log(`かわいさ優先のプロンプトを ${args.count} 件作ります（顔の指定なし）。`);
+    console.log();
+  } else if (args.spread) {
     prompts = buildSpreadPrompts(args.count, args);
     fillNote = '顔の型をひと通り作って、実測値のばらつきを増やすための指定です。';
     console.log(`顔の型 ${ARCHETYPES.length} 種類で ${args.count} 件のプロンプトを作ります:`);
