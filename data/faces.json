@@ -1015,6 +1015,32 @@
         "hairLength": 1.29933,
         "ageLook": 15.88524
       }
+    },
+    {
+      "id": "p1",
+      "file": "f82.jpg",
+      "gender": "female",
+      "genderProbability": 1,
+      "detectedGender": "female",
+      "age": 22.5,
+      "detScore": 0.962,
+      "raw": {
+        "faceLength": 0.77598,
+        "jawSharp": -0.64866,
+        "eyeSize": 0.12474,
+        "eyeTilt": 0.02274,
+        "eyeDistance": 0.27844,
+        "browEyeGap": 0.31394,
+        "browAngle": -0.06336,
+        "browArch": 0.1058,
+        "noseWidth": 0.34955,
+        "mouthWidth": 0.7554,
+        "lipThick": 0.21609,
+        "skinTone": -114.76787,
+        "hairColor": 70.35254,
+        "hairLength": 0,
+        "ageLook": 22.60336
+      }
     }
   ]
 }
