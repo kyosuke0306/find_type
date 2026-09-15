@@ -158,17 +158,18 @@ export function measurePixels(px, W, H, geo, stride = 3) {
     g: list.reduce((s, c) => s + c.g, 0) / list.length,
     b: list.reduce((s, c) => s + c.b, 0) / list.length,
   });
-  // 各隅について、それに近い隅がいくつあるかを数え、いちばん大きな集団を採る
+  // 各隅について、それに近い隅がいくつあるかを数え、いちばん大きな集団を採る。
+  // ここで見分けたいのは「背景か、写り込んだ肩か」なので許容は広めにとる。
+  // 照明のムラは L1 で 100 程度、肩は 200 以上離れる。
   let agree = [];
   for (const c of corners) {
-    const near = corners.filter((o) => near2(o, c, 70));
+    const near = corners.filter((o) => near2(o, c, 140));
     if (near.length > agree.length) agree = near;
   }
   const bg = agree.length ? mean(agree) : { r: 255, g: 255, b: 255 };
-
-  // 髪の長さは「髪色に近く、背景でも肌でもない画素」を数えて測るため、
-  // 背景が無地でないと成立しない。一致する隅が3つ未満なら計測不能として扱う。
-  const plainBg = agree.length >= 3;
+  // 背景がどれだけ均一か（隅どうしの色の開き）
+  const dist = (a, b) => Math.abs(a.r - b.r) + Math.abs(a.g - b.g) + Math.abs(a.b - b.b);
+  const bgSpread = agree.length ? Math.max(...agree.map((c) => dist(c, bg))) : 999;
 
   // 髪色の採取。頭の大きさは顔ごとに違うので固定距離では外すことがある。
   // 額の上から頭頂・こめかみへ順に探索し、「肌でも背景でもない」最初の点を髪とみなす。
@@ -182,6 +183,15 @@ export function measurePixels(px, W, H, geo, stride = 3) {
     if (near2(c, skin, 55) || near2(c, bg, 60)) continue;
     hair = c; hairProbe = q; break;
   }
+
+  // 髪の長さは「髪色に近く、背景でも肌でもない画素」を数えて測る。
+  // 背景が完全な無地である必要はなく、髪と背景の差が背景のムラより
+  // 十分大きければ見分けられる（暗い髪 × 明るい背景など）。
+  // 照明でうっすら濃淡のある背景を弾かないよう、その関係で判定する。
+  const hairBgGap = hair ? dist(hair, bg) : 0;
+  const plainBg = agree.length >= 3 && (bgSpread < 70 || bgSpread * 2 < hairBgGap);
+  // 背景を除外するときの許容幅。ムラのぶんだけ広げるが、髪まで飲み込まない範囲に留める。
+  const bgTol = bgSpread < 70 ? 70 : Math.min(bgSpread + 20, Math.max(70, hairBgGap * 0.5));
 
   // 髪の長さ: あごの下に向かって行ごとに走査し、髪がどこまで伸びているかを両目間距離で測る。
   //
@@ -203,7 +213,7 @@ export function measurePixels(px, W, H, geo, stride = 3) {
       for (let x = hx0; x < hx1; x++) {
         n++;
         const i = (y * W + x) * stride;
-        if (near(i, hair, 110) && !near(i, bg, 70) && !near(i, skin, 80)) c++;
+        if (near(i, hair, 110) && !near(i, bg, bgTol) && !near(i, skin, 80)) c++;
       }
       if (n && c / n >= ROW_MIN) lastHairRow = y;
     }
