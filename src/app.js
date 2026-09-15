@@ -2,7 +2,7 @@
 
 import { FEATURES, KEYS, FACE_KEYS, LOOK_KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
-import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue } from './model.js';
+import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, tierOf } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -98,10 +98,10 @@ function buildStartScreen() {
 
   // 精度は同梱プールでの実測値（node test/simulate.mjs <問数> 120 --pool data/faces.json）
   $('rounds-choices').innerHTML = [
-    { v: 20, label: 'さくっと', acc: 83 },
-    { v: 30, label: 'おすすめ', acc: 85 },
+    { v: 20, label: 'さくっと', acc: 81 },
+    { v: 30, label: 'おすすめ', acc: 84 },
     { v: 45, label: 'しっかり', acc: 87 },
-    { v: 90, label: 'とことん', acc: 91 },
+    { v: 90, label: 'とことん', acc: 90 },
   ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
       <span class="big">${r.v}</span><span class="sub">${r.label}</span>
       <span class="acc">精度 ${r.acc}%</span></button>`).join('');
@@ -204,7 +204,11 @@ async function showPair() {
   // 判定に効く組み合わせではスキップを閉じる。
   // 推定が始まる前は「効く組み合わせ」を判断できないので閉じない。
   const model = state.history.filter((h) => !h.skipped).length >= 6 ? state.model : null;
-  state.locked = !!model && pairValue(a, b, model, state.stats) >= SKIP_LOCK;
+  // かわいい層以外の回は必ず閉じる。
+  // 飛ばされやすい回なのに、顔のパーツの幅がいちばん広いのがこの層なので、
+  // 飛ばされるとこの層を入れた意味がなくなる（test/simulate.mjs で確認した）。
+  const plain = tierOf(a) !== 'cute' && tierOf(b) !== 'cute';
+  state.locked = plain || (!!model && pairValue(a, b, model, state.stats) >= SKIP_LOCK);
   $('btn-skip').disabled = state.locked;
   $('skip-lock').hidden = !state.locked;
   arena.classList.toggle('is-locked', state.locked);

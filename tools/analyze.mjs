@@ -40,7 +40,7 @@ async function detect(tensor, minScore, multi) {
 }
 
 function parseArgs(argv) {
-  const a = { from: null, out: 'data/faces', json: 'data/faces.json', size: 480, minScore: 0.45, append: false, limit: Infinity, debug: null, multi: false, gender: null };
+  const a = { from: null, out: 'data/faces', json: 'data/faces.json', size: 480, minScore: 0.45, append: false, limit: Infinity, debug: null, multi: false, gender: null, tier: 'cute' };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--from') a.from = argv[++i];
@@ -52,10 +52,11 @@ function parseArgs(argv) {
     else if (k === '--append') a.append = true;
     else if (k === '--multi') a.multi = true;
     else if (k === '--gender') a.gender = argv[++i];
+    else if (k === '--tier') a.tier = argv[++i];
     else if (k === '--debug') a.debug = argv[++i] ?? '.cache/debug';
   }
   if (!a.from) {
-    console.error('使い方: node tools/analyze.mjs --from <画像フォルダ> [--out data/faces] [--size 480] [--append] [--multi] [--gender female|male] [--debug .cache/debug]');
+    console.error('使い方: node tools/analyze.mjs --from <画像フォルダ> [--out data/faces] [--size 480] [--append] [--multi] [--gender female|male] [--tier cute|plain] [--debug .cache/debug]');
     process.exit(1);
   }
   return a;
@@ -230,6 +231,8 @@ async function extractFace(det, ctx) {
     missing,
     face: {
       id, file: outName, source,
+      // かわいさの層。違う層どうしは並べない（src/model.js の choosePair）
+      tier: args.tier,
       // 自動判定はショートヘアの女性を男性と誤りやすいので、--gender で上書きできる
       gender: args.gender ?? det.gender,
       genderProbability: args.gender ? 1 : Number(det.genderProbability.toFixed(3)),
@@ -291,7 +294,16 @@ async function main() {
       t.dispose();
       if (!dets.length) { skipped++; console.log(`  [skip] 顔を検出できません: ${file}`); continue; }
 
-      const baseId = path.basename(file, path.extname(file)).replace(/[^a-zA-Z0-9_-]/g, '') || `face${n}`;
+      // id は顔ごとに一意でなければならない。重なると、結果に出す「好みに近い顔」が
+      // 別人になったり、同じ顔を出しすぎない仕組みが効かなくなる。
+      // --append で同じ名前の画像を取り込むと重なるので、必ず連番を足して避ける。
+      const taken = new Set(faces.map((f) => f.id));
+      let baseId = path.basename(file, path.extname(file)).replace(/[^a-zA-Z0-9_-]/g, '') || `face${n}`;
+      if (taken.has(baseId)) {
+        let k = 2;
+        while (taken.has(`${baseId}_${k}`)) k++;
+        baseId = `${baseId}_${k}`;
+      }
       // 顔が1つの画像は、複数解像度で測って中央値を採る（ノイズが下がる）
       const robust = dets.length === 1 ? await measureRobust(buf, args.minScore) : null;
 

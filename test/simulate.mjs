@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { KEYS, normalizePool } from '../src/features.js';
-import { fit, predict, choosePair, updateStats, newStats, utilityDelta } from '../src/model.js';
+import { fit, predict, choosePair, updateStats, newStats, utilityDelta, tierOf } from '../src/model.js';
 const W = process.env.PW ? JSON.parse(process.env.PW) : undefined;
 
 // --pool data/faces.json を渡すと、合成プールではなく実際の顔で検証する。
@@ -11,6 +11,15 @@ const W = process.env.PW ? JSON.parse(process.env.PW) : undefined;
 const poolAt = process.argv.indexOf('--pool');
 const POOL_PATH = poolAt > 0 ? process.argv[poolAt + 1] : null;
 const POOL_FACES = POOL_PATH ? JSON.parse(fs.readFileSync(POOL_PATH, 'utf8')).faces : null;
+
+// --attr 3 を渡すと、仮想ユーザーに「かわいい方を選ぶ」性質を持たせる。
+// 実際のユーザーは顔のパーツの好み以前にかわいさで選ぶので、
+// 同梱プールの精度はこちらのほうが実態に近い。
+// 3.0 は「かわいい方をほぼ必ず選ぶ」強さ（sigmoid(3) = 95%）。
+// このとき評価は同じ層どうしのペアだけで行う。層をまたぐペアは
+// かわいさで決まってしまい、パーツの好みを当てられたかを測れないため。
+const attrAt = process.argv.indexOf('--attr');
+const ATTR = attrAt > 0 ? Number(process.argv[attrAt + 1]) : 0;
 
 const mulberry = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const sigmoid = (z) => 1 / (1 + Math.exp(-z));
@@ -48,7 +57,9 @@ function makeUser(rand, nImportant = 4) {
   return { m, a: s.map(Math.log), keys: KEYS, important: idx };
 }
 
-function runSession(pool, user, rounds, rand, adaptive) {
+const cuteness = (f) => (tierOf(f) === 'cute' ? 1 : 0);
+
+function runSession(pool, user, rounds, rand, adaptive, attr) {
   const comparisons = [];
   const stats = newStats();
   let model = null;
@@ -61,7 +72,7 @@ function runSession(pool, user, rounds, rand, adaptive) {
       let j = Math.floor(rand() * (pool.length - 1)); if (j >= i) j++;
       [A, B] = [pool[i], pool[j]];
     }
-    const p = sigmoid(utilityDelta(user, A.v, B.v));
+    const p = sigmoid(utilityDelta(user, A.v, B.v) + attr * (cuteness(A) - cuteness(B)));
     const aWins = rand() < p;
     comparisons.push({ win: aWins ? A.v : B.v, lose: aWins ? B.v : A.v });
     updateStats(stats, A, B);
@@ -70,13 +81,15 @@ function runSession(pool, user, rounds, rand, adaptive) {
   return fit(comparisons);
 }
 
-function evaluate(pool, user, model, rand) {
-  // 未知のペアで「真の好み」と一致するか
+function evaluate(pool, user, model, rand, attr) {
+  // 未知のペアで「真の好み」と一致するか。
+  // かわいさを持たせたときは、それが打ち消し合う同じ層どうしで測る。
+  const from = attr ? pool.filter((f) => tierOf(f) === 'cute') : pool;
   let ok = 0, n = 600;
   for (let t = 0; t < n; t++) {
-    const i = Math.floor(rand() * pool.length);
-    let j = Math.floor(rand() * (pool.length - 1)); if (j >= i) j++;
-    const A = pool[i].v, B = pool[j].v;
+    const i = Math.floor(rand() * from.length);
+    let j = Math.floor(rand() * (from.length - 1)); if (j >= i) j++;
+    const A = from[i].v, B = from[j].v;
     const truth = utilityDelta(user, A, B) > 0;
     const pred = predict(model, A, B) > 0.5;
     if (truth === pred) ok++;
@@ -96,15 +109,15 @@ function evaluate(pool, user, model, rand) {
  * faces に data/faces.json の faces を渡すと実際の顔で測れる。
  * 渡さなければ合成プールを使う。
  */
-export function benchmark({ faces = null, rounds = 30, trials = 60, adaptive = true } = {}) {
-  const real = faces ? normalizePool(faces).map((f) => ({ id: f.file, v: f.v })) : null;
+export function benchmark({ faces = null, rounds = 30, trials = 60, adaptive = true, attr = 0 } = {}) {
+  const real = faces ? normalizePool(faces).map((f) => ({ id: f.file, v: f.v, tier: f.tier })) : null;
   const agg = { acc: 0, hit: 0, hit5: 0, merr: 0 };
   for (let t = 0; t < trials; t++) {
     const rand = mulberry(1000 + t);
     const pool = real ?? makePool(160, rand);
     const user = makeUser(rand);
-    const model = runSession(pool, user, rounds, rand, adaptive);
-    const e = evaluate(pool, user, model, rand);
+    const model = runSession(pool, user, rounds, rand, adaptive, attr);
+    const e = evaluate(pool, user, model, rand, attr);
     for (const k in agg) agg[k] += e[k];
   }
   for (const k in agg) agg[k] /= trials;
@@ -117,8 +130,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const ROUNDS = Number(POS[0] ?? 30);
   const TRIALS = Number(POS[1] ?? 60);
   for (const adaptive of [false, true]) {
-    const r = benchmark({ faces: POOL_FACES, rounds: ROUNDS, trials: TRIALS, adaptive });
+    const r = benchmark({ faces: POOL_FACES, rounds: ROUNDS, trials: TRIALS, adaptive, attr: ATTR });
     const f = (x) => r[x].toFixed(3);
-    console.log(`${adaptive ? 'adaptive' : 'random  '} ${POOL_FACES ? `実プール${r.size}枚 ` : ''}rounds=${ROUNDS}  予測一致率=${f('acc')}  重要特徴Top3的中=${f('hit')}  Top5内=${f('hit5')}  理想値誤差=${f('merr')}`);
+    console.log(`${adaptive ? 'adaptive' : 'random  '} ${POOL_FACES ? `実プール${r.size}枚 ` : ''}${ATTR ? `かわいさ${ATTR} ` : ''}rounds=${ROUNDS}  予測一致率=${f('acc')}  重要特徴Top3的中=${f('hit')}  Top5内=${f('hit5')}  理想値誤差=${f('merr')}`);
   }
 }

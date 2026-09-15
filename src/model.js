@@ -143,9 +143,18 @@ export function looAccuracy(comparisons, keys = KEYS, opts = {}) {
  *  - すでに十分わかった特徴では差が小さい
  *  - 現モデルの予測が五分五分（＝情報量が大きい）
  * ペアを候補の中から選ぶことで、少ない回数でも各特徴を見分けられるようにする。
+ *
+ * かわいさの層（tier）が違う顔どうしは並べない。
+ * かわいい顔とそうでない顔を並べると、誰でもかわいい方を選ぶので
+ * その回は「その人の好み」ではなく「世間一般のかわいさ」しか測れない。
+ * しかも顔のパーツとかわいさには相関があるため（あごのラインなど）、
+ * 混ぜたまま出すと全員が同じ結果に寄っていく。
+ * 同じ層どうしに限れば、かわいさの差が打ち消し合ってパーツの好みだけが残る。
  */
 // test/simulate.mjs で調整した重み
 export const PAIR_WEIGHTS = { gain: 2, spread: 0, unc: 1, fatigue: 0.6 };
+
+export const tierOf = (f) => f.tier ?? 'cute';
 
 export function choosePair(faces, model, stats, rand = Math.random, keys = KEYS, W = PAIR_WEIGHTS) {
   const n = faces.length;
@@ -160,6 +169,7 @@ export function choosePair(faces, model, stats, rand = Math.random, keys = KEYS,
     let j = Math.floor(rand() * (n - 1));
     if (j >= i) j++;
     const A = faces[i], B = faces[j];
+    if (tierOf(A) !== tierOf(B)) continue;
     if (stats?.usedPairs?.has(pairId(A, B))) continue;
 
     let gain = 0, spread = 0;
@@ -177,8 +187,21 @@ export function choosePair(faces, model, stats, rand = Math.random, keys = KEYS,
     const s = W.gain * gain - W.spread * spread + W.unc * uncertainty - W.fatigue * fatigue + rand() * 0.05;
     if (s > bestScore) { bestScore = s; best = [A, B]; }
   }
-  if (!best) best = [faces[0], faces[1]];
+  // 候補を引き当てられなかったとき（片方の層を引き尽くしたなど）も層はまたがない
+  if (!best) best = fallbackPair(faces);
   return rand() < 0.5 ? best : [best[1], best[0]];
+}
+
+/** いちばん枚数の多い層から 2 枚。層が取れなければ先頭の 2 枚。 */
+function fallbackPair(faces) {
+  const byTier = new Map();
+  for (const f of faces) {
+    const t = tierOf(f);
+    if (!byTier.has(t)) byTier.set(t, []);
+    byTier.get(t).push(f);
+  }
+  const biggest = [...byTier.values()].sort((a, b) => b.length - a.length)[0];
+  return biggest.length >= 2 ? [biggest[0], biggest[1]] : [faces[0], faces[1]];
 }
 
 /**
