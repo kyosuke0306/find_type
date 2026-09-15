@@ -325,39 +325,47 @@ async function finishSession() {
 /** 結果で言い切ってよい項目か（古い保存結果には情報がないので全部通す） */
 const usableOf = (r) => (r.usable ? new Set(r.usable) : new Set(KEYS));
 
-/**
- * 効いていた特徴をまとめて、顔のタイプを一文で言う。
- *
- * 単語を「×」で並べるだけだと、何を見て決めているのかが伝わらない。
- * 重視度の高い顔のパーツ2つを連体形でつなぎ、きれい系／かわいい系の判定を
- * 添えて「〜顔がタイプ」という形にする。
- * 言い切れる根拠がないときは、無理に決めつけない文にする。
- */
-function typePhrase(r) {
+/** 効いていた顔のパーツを、重視度の高い順に返す（見出しと式で共用） */
+function topTags(r, limit) {
   const usable = usableOf(r);
   const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]);
-  const parts = [];
+  const tags = [];
   for (const i of order) {
-    if (parts.length >= 2) break;
+    if (tags.length >= limit) break;
     if (!usable.has(KEYS[i]) || !FACE_KEYS.includes(KEYS[i])) continue;
     if (r.importance[i] < 0.085 || (r.support?.[i] ?? 0) < 3) continue;
     const f = FEATURES[i], m = r.m[i];
-    parts.push(m > 0.62 ? f.highPhrase : m < 0.38 ? f.lowPhrase : f.midPhrase);
+    tags.push(m > 0.62 ? f.highTag : m < 0.38 ? f.lowTag : `中間の${f.name}`);
   }
+  return tags;
+}
 
-  // きれい系／かわいい系は、根拠が薄いときは足さない（renderStyle と同じ条件）
-  const { score, basis } = cuteScore(r.m, r.importance, usable);
-  if (Math.abs(score) >= 0.12 && basis >= 0.35) {
-    parts.push(score > 0 ? 'かわいい系の' : 'きれい系の');
-  }
+/**
+ * 顔のタイプを一言で言う。
+ *
+ * いちばん効いていたパーツに、きれい系／かわいい系の判定を添えるだけにする。
+ * 内訳は下の「×」の式とタグが受け持つので、ここは短さを優先する。
+ * 系統は言い切れる根拠があるときだけ足す（renderStyle と同じ条件）。
+ */
+function typePhrase(r) {
+  const tags = topTags(r, 1);
+  const { score, basis } = cuteScore(r.m, r.importance, usableOf(r));
+  const style = Math.abs(score) >= 0.12 && basis >= 0.35
+    ? (score > 0 ? 'かわいい系' : 'きれい系') : null;
+  if (!tags.length) return style ? `${style}タイプ` : '雰囲気で選ぶタイプ';
+  return style ? `${tags[0]}の${style}タイプ` : `${tags[0]}タイプ`;
+}
 
-  if (!parts.length) return 'パーツより全体の雰囲気で選ぶタイプ';
-  return `${parts.join('、')}顔がタイプ`;
+/** 効いていたパーツを掛け算の形で並べる（見出しの内訳） */
+function typeFormula(r) {
+  const tags = topTags(r, 3);
+  return tags.length ? tags.join(' × ') : '顔のパーツにはこだわり少なめ';
 }
 
 function renderResult(r) {
   const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]);
   $('result-title').textContent = typePhrase(r);
+  $('result-formula').textContent = typeFormula(r);
 
   // 上位項目をタグで見せる（説明文の代わり）。
   // 重視度がほぼ0の項目を並べても意味がないので、目立つものだけ出す。
@@ -568,6 +576,7 @@ async function copyResult(r) {
   const text = [
     '【顔の好み診断】',
     `私のタイプ → ${typePhrase(r)}`,
+    `内訳 → ${typeFormula(r)}`,
     `系統 → ${style}`,
     `よく見ている → ${parts.map((p) => `${p.name} ${Math.round(p.share * 100)}%`).join(' / ')}`,
     order.map((i) => `${FEATURES[i].name} ${Math.round(r.importance[i] * 100)}%`).join(' / '),
