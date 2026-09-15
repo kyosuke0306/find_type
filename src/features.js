@@ -26,6 +26,51 @@ export const KEYS = FEATURES.map((f) => f.key);
 export const FEATURE_BY_KEY = Object.fromEntries(FEATURES.map((f) => [f.key, f]));
 
 /**
+ * 「きれい系 ⇔ かわいい系」の軸。
+ * w    … その特徴がこの軸をどれだけ決めるか
+ * sign … +1 なら値が大きいほど「かわいい系」、-1 なら「きれい系」
+ * 鼻の広さ・肌・髪はどちらの系統にも寄らないので入れていない。
+ */
+export const CUTE_AXIS = {
+  ageLook:     { w: 1.0, sign: -1 },  // 童顔 ↔ 大人顔
+  jawSharp:    { w: 0.9, sign: -1 },  // ふんわり輪郭 ↔ シャープ輪郭
+  eyeSize:     { w: 0.9, sign: +1 },  // 切れ長 ↔ ぱっちり目
+  faceLength:  { w: 0.8, sign: -1 },  // 丸顔 ↔ 面長
+  eyeTilt:     { w: 0.8, sign: -1 },  // タレ目 ↔ ツリ目
+  browArch:    { w: 0.6, sign: -1 },  // 平行眉 ↔ アーチ眉
+  browAngle:   { w: 0.6, sign: -1 },  // 下がり眉 ↔ 上がり眉
+  browEyeGap:  { w: 0.5, sign: +1 },  // 彫り深め ↔ 離れ眉
+  mouthWidth:  { w: 0.5, sign: -1 },  // おちょぼ口 ↔ 大きな口
+  eyeDistance: { w: 0.4, sign: +1 },  // 求心顔 ↔ 遠心顔
+  lipThick:    { w: 0.3, sign: +1 },  // 薄い唇 ↔ ぽってり唇
+};
+
+/**
+ * 推定した好み（理想値 m と重視度 importance）を、系統の1本の軸に落とす。
+ *   score  -1（きれい系）〜 +1（かわいい系）
+ *   basis  その判定の根拠の確かさ 0..1。
+ *          髪や肌など系統に関係ない特徴ばかり重視している人は小さくなる。
+ *   top    この判定を決めた特徴（FEATURES の添字）を効いた順に
+ */
+export function cuteScore(m, importance) {
+  let num = 0, den = 0, all = 0;
+  const parts = [];
+  KEYS.forEach((k, i) => {
+    all += importance[i];
+    const a = CUTE_AXIS[k];
+    if (!a) return;
+    const w = a.w * importance[i];
+    const c = w * a.sign * (m[i] - 0.5) * 2;
+    num += c;
+    den += w;
+    parts.push({ i, c });
+  });
+  const top = parts.filter((p) => Math.abs(p.c) > 1e-4)
+    .sort((x, y) => Math.abs(y.c) - Math.abs(x.c)).map((p) => p.i);
+  return { score: den ? num / den : 0, basis: all ? den / all : 0, top };
+}
+
+/**
  * プール内の順位にもとづき raw 値を 0..1 に正規化する。
  * 絶対値ではなく「この集団の中で相対的にどのあたりか」に揃える。
  * 同値は同じ正規化値になるよう平均順位を使う。

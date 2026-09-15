@@ -1,6 +1,7 @@
 // 画面遷移と診断の進行。推定そのものは model.js、特徴の定義は features.js にある。
 
-import { FEATURES, KEYS, normalizePool } from './features.js';
+import { FEATURES, KEYS, normalizePool, cuteScore } from './features.js';
+import { partShares, faceMapSvg } from './facemap.js';
 import { fit, choosePair, updateStats, newStats, score, looAccuracy } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
@@ -312,6 +313,8 @@ function renderResult(r) {
        <b>${Math.round(r.importance[i] * 100)}%</b></span>`).join('');
 
   $('t-top').innerHTML = `${icon('crown')}好みに近い顔`;
+  $('t-style').innerHTML = `${icon('sparkle')}きれい系 or かわいい系`;
+  $('t-where').innerHTML = `${featureIcon('eyeSize')}どこを見て決めているか`;
   $('t-feat').innerHTML = `${icon('chart')}効いていた特徴`;
   $('t-chosen').innerHTML = `${icon('heart', { cls: 'is-heart' })}選んだ顔 <span class="card-note">${r.chosen.length}枚</span>`;
 
@@ -320,6 +323,8 @@ function renderResult(r) {
     <figure><img src="${srcOf(id)}" alt="好みに近い顔 ${i + 1}位" loading="lazy">
     <span class="rank">${i + 1}</span></figure>`).join('');
 
+  renderStyle(r);
+  renderFaceMap(r);
   renderFeatures(r);
 
   const pct = Math.round((r.loo ?? r.trainAccuracy) * 100);
@@ -338,8 +343,8 @@ function renderResult(r) {
 
   // 描画が終わってからバー・ゲージ・数値を動かす
   requestAnimationFrame(() => {
-    document.querySelectorAll('.feat-fill').forEach((el) => { el.style.width = el.dataset.w; });
-    document.querySelectorAll('.marker').forEach((el) => { el.style.left = el.dataset.left; });
+    document.querySelectorAll('.feat-fill, .fm-fill').forEach((el) => { el.style.width = el.dataset.w; });
+    document.querySelectorAll('.marker, .style-marker').forEach((el) => { el.style.left = el.dataset.left; });
     $('gauge-fill').style.strokeDashoffset = String(264 - 264 * (pct / 100));
     countUp($('consistency-num'), pct);
   });
@@ -355,6 +360,40 @@ function countUp(el, target, ms = 1100) {
     if (k < 1) requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
+}
+
+/** きれい系 ⇔ かわいい系 のどちらに寄っているか */
+function renderStyle(r) {
+  const { score, basis, top } = cuteScore(r.m, r.importance);
+  const cute = score > 0;
+  const strength = Math.abs(score);
+  // 根拠が薄いとき（髪や肌ばかり見ている人）は言い切らない
+  const vague = basis < 0.35 || strength < 0.12;
+  const word = cute ? 'かわいい系' : 'きれい系';
+  $('style-verdict').innerHTML = vague
+    ? 'どちらも同じくらい'
+    : `${strength >= 0.45 ? 'はっきり' : 'どちらかといえば'}<b>${word}</b>`;
+  $('style-verdict').classList.toggle('is-vague', vague);
+  $('style-verdict').classList.toggle('is-cute', !vague && cute);
+  $('style-note').textContent = vague
+    ? '系統で選ぶより、個々のパーツを見ているようです'
+    : `${top.slice(0, 2).map((i) => FEATURES[i].name).join('と')}が決め手です`;
+  const marker = $('style-marker');
+  marker.dataset.left = `${((score + 1) / 2) * 100}%`;
+  marker.classList.toggle('is-vague', vague);
+  marker.classList.toggle('is-cute', !vague && cute);
+}
+
+/** 顔のどこを見て決めているか。顔の絵とパーツ別の割合で見せる */
+function renderFaceMap(r) {
+  const shares = partShares(r.importance);
+  $('facemap-art').innerHTML = faceMapSvg(shares);
+  $('facemap-list').innerHTML = shares.map((p, n) => `
+    <li style="--i:${n}">
+      <span class="fm-name">${p.name}</span>
+      <span class="fm-bar"><i class="fm-fill" data-w="${(p.share / Math.max(shares[0].share, 1e-6)) * 100}%"></i></span>
+      <span class="fm-pct">${Math.round(p.share * 100)}%</span>
+    </li>`).join('');
 }
 
 function renderFeatures(r) {
@@ -397,9 +436,15 @@ function renderFeatures(r) {
 
 async function copyResult(r) {
   const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]).slice(0, 3);
+  const { score, basis } = cuteScore(r.m, r.importance);
+  const style = basis < 0.35 || Math.abs(score) < 0.12 ? 'どちらも同じくらい'
+    : `${Math.abs(score) >= 0.45 ? 'はっきり' : 'どちらかといえば'}${score > 0 ? 'かわいい系' : 'きれい系'}`;
+  const parts = partShares(r.importance).slice(0, 3);
   const text = [
     '【顔の好み診断】',
     `私のタイプ → ${typeName(r)}`,
+    `系統 → ${style}`,
+    `よく見ている → ${parts.map((p) => `${p.name} ${Math.round(p.share * 100)}%`).join(' / ')}`,
     order.map((i) => `${FEATURES[i].name} ${Math.round(r.importance[i] * 100)}%`).join(' / '),
     `一貫性 ${Math.round((r.loo ?? r.trainAccuracy) * 100)}%（${r.rounds}回）`,
   ].join('\n');
