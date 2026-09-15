@@ -111,6 +111,35 @@ const FILL_PHRASES = {
   hairLength:  ['a short pixie cut', 'very long hair past the chest'],
 };
 
+// 測定ノイズ（tools/noise-check.mjs の実測値。coverage.mjs と同じ）。
+// 「実測の幅 ÷ ノイズ2つ分」で、その項目が何段階に見分けられるかが出る。
+// 段階が少ない項目は、人が見ても差が分からない＝選ぶ手がかりにならない。
+const NOISE = { faceLength:1.55e-3, jawSharp:9.68e-4, eyeSize:5.43e-4, eyeTilt:4.84e-4,
+  eyeDistance:5.24e-4, browEyeGap:2.31e-3, browAngle:2.18e-3, browArch:7.07e-4,
+  noseWidth:7.47e-4, mouthWidth:3.34e-3, lipThick:1.50e-3, skinTone:7.46e-1,
+  hairColor:1.59, hairLength:4.98e-3, ageLook:5.17e-1 };
+const LEVELS_OK = 18;   // これを下回る項目は幅が足りない
+
+// 1項目だけを狙うときに使う、はっきりした言い回し。
+// 端を何本も重ねると顔が崩れるが、1本だけなら崩れない。
+const STRONG_PHRASES = {
+  faceLength:  ['a distinctly round wide face', 'a distinctly long slender face'],
+  jawSharp:    ['a very soft rounded jawline with a wide chin', 'a very sharp narrow V-line chin'],
+  eyeSize:     ['notably narrow slim eyes', 'notably large round eyes'],
+  eyeTilt:     ['clearly downturned outer eye corners', 'clearly upturned outer eye corners'],
+  eyeDistance: ['eyes set clearly close together', 'eyes set clearly wide apart'],
+  browEyeGap:  ['eyebrows sitting right above the eyes', 'eyebrows set clearly high above the eyes'],
+  browAngle:   ['clearly downward-slanting eyebrows', 'clearly upward-angled eyebrows'],
+  browArch:    ['completely straight flat eyebrows', 'clearly arched eyebrows'],
+  noseWidth:   ['a clearly narrow slim nose', 'a clearly wide rounded nose'],
+  mouthWidth:  ['a clearly small mouth', 'a clearly wide mouth'],
+  lipThick:    ['clearly thin lips', 'clearly full plump lips'],
+  ageLook:     ['18 years old, a very youthful girlish face', '25 years old, a composed grown-up face'],
+  skinTone:    ['very fair porcelain skin', 'clearly tanned skin'],
+  hairColor:   ['jet black hair', 'brightly dyed light brown hair'],
+  hairLength:  ['a very short pixie cut', 'very long hair past the chest'],
+};
+
 /**
  * 既存のプールを調べ、足りていない組み合わせを「目標」として並べる。
  * 精度が上がらない原因は主に2つある。
@@ -121,6 +150,23 @@ const FILL_PHRASES = {
 function planFill(faces) {
   const pool = normalizePool(faces);
   const targets = [];
+
+  // 0. 幅そのものが足りない項目。
+  // 人の目に差が見えないと選ぶ手がかりにならず、その項目は診断できない。
+  // 両端をはっきり作らせるのが最優先。
+  for (const [i, k] of KEYS.entries()) {
+    const xs = faces.map((f) => f.raw[k]).filter(Number.isFinite);
+    if (xs.length < 5) continue;
+    const levels = (Math.max(...xs) - Math.min(...xs)) / (NOISE[k] * 2);
+    if (levels >= LEVELS_OK) continue;
+    for (const end of [0, 1]) {
+      targets.push({
+        why: `${FEATURES[i].name}の幅が狭い（${levels.toFixed(0)}段階しかなく差が見えない）`,
+        set: { [k]: end }, strong: true,
+        harm: 2 + (LEVELS_OK - levels) / LEVELS_OK,
+      });
+    }
+  }
 
   // 1. 端が少ない項目
   for (const [i, k] of KEYS.entries()) {
@@ -191,7 +237,10 @@ function buildFillPrompts(targets, n, opts) {
     // 狙いの項目だけを端に振る。
     // 以前はここでも端の言い回しを足していたが、端を何本も重ねると
     // 顔が崩れる。狙い以外は、どれを引いてもかわいく見える語彙から選ぶ。
-    const phrases = KEYS.filter((k) => k !== 'ageLook' && k in set).map((k) => FILL_PHRASES[k][set[k]]);
+    // 狙いが1項目だけのときは、はっきりした言い回しを使う。
+    // 端を1本だけ振るぶんには顔は崩れない。
+    const book = tgt.strong ? STRONG_PHRASES : FILL_PHRASES;
+    const phrases = KEYS.filter((k) => k !== 'ageLook' && k in set).map((k) => book[k][set[k]]);
     const extras = [
       ['eyes', 'eyes'], ['brows', 'brows'], ['shape', 'faceShape'],
       ['nose', 'nose'], ['mouth', 'lips'], ['hair', 'hair'],
@@ -203,9 +252,8 @@ function buildFillPrompts(targets, n, opts) {
       const w = list[Math.floor(rand() * list.length)];
       phrases.push(['shape', 'nose'].includes(part) ? an(w) : w);
     }
-    if (!used.has('hair')) phrases.push(axes.hairColor[Math.floor(rand() * axes.hairColor.length)]);
 
-    const age = set.ageLook !== undefined ? FILL_PHRASES.ageLook[set.ageLook] : AXES.age[Math.floor(rand() * AXES.age.length)];
+    const age = set.ageLook !== undefined ? book.ageLook[set.ageLook] : AXES.age[Math.floor(rand() * AXES.age.length)];
     // 条件を並べると美しさの指定が薄まるので、最後にもう一度念を押す
     const variation = `Japanese woman, ${age}, ${phrases.join(', ')}, still a strikingly pretty and cute face`;
     out.push({
