@@ -25,6 +25,32 @@ export const FEATURES = [
 export const KEYS = FEATURES.map((f) => f.key);
 export const FEATURE_BY_KEY = Object.fromEntries(FEATURES.map((f) => [f.key, f]));
 
+// 実測のばらつき（tools/noise-check.mjs で測った値）。
+// 同じ顔を少しずつ違う解像度で解析したときに値がどれだけ動くか。
+const NOISE = { faceLength:1.55e-3, jawSharp:9.68e-4, eyeSize:5.43e-4, eyeTilt:4.84e-4,
+  eyeDistance:5.24e-4, browEyeGap:2.31e-3, browAngle:2.18e-3, browArch:7.07e-4,
+  noseWidth:7.47e-4, mouthWidth:3.34e-3, lipThick:1.50e-3, skinTone:7.46e-1,
+  hairColor:1.59, hairLength:4.98e-3, ageLook:5.17e-1 };
+
+// 「プール内の実測の幅 ÷ ノイズ2つ分」が何段階に見分けられるか。
+// これを下回る項目は、顔どうしの差が小さすぎて人の目にも見えない。
+// 正規化すると順位に引き伸ばされて大差に見えるが、中身は誤差でしかない。
+const MIN_LEVELS = 15;
+
+/**
+ * 診断結果として言い切ってよい項目を返す。
+ * 幅が足りない項目は、当たっているように見えても根拠がない。
+ */
+export function measurableKeys(faces) {
+  const ok = new Set();
+  for (const k of KEYS) {
+    const xs = faces.map((f) => f.raw?.[k]).filter(Number.isFinite);
+    if (xs.length < 5) continue;
+    if ((Math.max(...xs) - Math.min(...xs)) / (NOISE[k] * 2) >= MIN_LEVELS) ok.add(k);
+  }
+  return ok;
+}
+
 /**
  * 「きれい系 ⇔ かわいい系」の軸。
  * w    … その特徴がこの軸をどれだけ決めるか
@@ -52,10 +78,11 @@ export const CUTE_AXIS = {
  *          髪や肌など系統に関係ない特徴ばかり重視している人は小さくなる。
  *   top    この判定を決めた特徴（FEATURES の添字）を効いた順に
  */
-export function cuteScore(m, importance) {
+export function cuteScore(m, importance, usable = null) {
   let num = 0, den = 0, all = 0;
   const parts = [];
   KEYS.forEach((k, i) => {
+    if (usable && !usable.has(k)) return;
     all += importance[i];
     const a = CUTE_AXIS[k];
     if (!a) return;

@@ -317,6 +317,10 @@ code {
   transition: left .9s cubic-bezier(.2,.8,.2,1); transition-delay: calc(.06s * var(--i) + .35s);
 }
 .feat.is-weak { opacity: .5; }
+/* 同梱の顔どうしで差が小さく、好みを読み取れない項目 */
+.feat.is-unmeasurable { opacity: .55; }
+.feat.is-unmeasurable .card-note { margin: 2px 0 0; font-size: .74rem; }
+.feat-note { font-size: .74rem; color: var(--ink-dim); }
 
 /* ---------- きれい系 / かわいい系 ---------- */
 .style-verdict { font-size: 1.15rem; margin: 0 0 14px; text-align: center; }

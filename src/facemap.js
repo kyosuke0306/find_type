@@ -13,12 +13,16 @@ export const FACE_PARTS = [
   { id: 'skin',    name: '肌・雰囲気', keys: ['skinTone', 'ageLook'] },
 ];
 
-/** パーツごとの重視度の割合を、大きい順に返す */
-export function partShares(importance) {
-  const byKey = Object.fromEntries(KEYS.map((k, i) => [k, importance[i] ?? 0]));
+/**
+ * パーツごとの重視度の割合を、大きい順に返す。
+ * usable を渡すと、そこに無い項目（顔どうしの差が小さくて判定できない項目）は数えない。
+ */
+export function partShares(importance, usable = null) {
+  const byKey = Object.fromEntries(KEYS.map((k, i) => [k, usable && !usable.has(k) ? 0 : (importance[i] ?? 0)]));
   const rows = FACE_PARTS.map((p) => ({ ...p, sum: p.keys.reduce((s, k) => s + byKey[k], 0) }));
   const total = rows.reduce((s, r) => s + r.sum, 0);
   return rows
+    .filter((r) => r.sum > 0 || !usable)
     .map((r) => ({ id: r.id, name: r.name, share: total ? r.sum / total : 0 }))
     .sort((a, b) => b.share - a.share);
 }

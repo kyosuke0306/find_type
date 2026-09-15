@@ -1,6 +1,6 @@
 // 画面遷移と診断の進行。推定そのものは model.js、特徴の定義は features.js にある。
 
-import { FEATURES, KEYS, normalizePool, cuteScore } from './features.js';
+import { FEATURES, KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
 import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue } from './model.js';
 import { icon, featureIcon } from './icons.js';
@@ -57,8 +57,11 @@ function showSetupNeeded(reason) {
 
 /** 顔プールを読み込んで、プール内での相対値に正規化する */
 async function reloadPool() {
-  state.pool = normalizePool(await loadBundled());
+  const bundled = await loadBundled();
+  state.pool = normalizePool(bundled);
   state.byId = new Map(state.pool.map((f) => [f.id, f]));
+  // 顔どうしの差が小さすぎる項目は、結果で言い切らない
+  state.usable = measurableKeys(bundled);
 }
 
 async function loadBundled() {
@@ -305,6 +308,7 @@ async function finishSession() {
     m: model.m, importance: model.importance, support: model.support,
     loo, trainAccuracy: model.trainAccuracy,
     poolSize: state.faces.length,
+    usable: [...state.usable],
     top: ranked.slice(0, 3).map((f) => f.id),
     chosen: state.history.filter((h) => !h.skipped).map((h) => h.winner),
   };
@@ -314,12 +318,17 @@ async function finishSession() {
   show('screen-result');
 }
 
+/** 結果で言い切ってよい項目か（古い保存結果には情報がないので全部通す） */
+const usableOf = (r) => (r.usable ? new Set(r.usable) : new Set(KEYS));
+
 /** 重視度の高い特徴を並べてタイプ名にする */
 function typeName(r) {
+  const usable = usableOf(r);
   const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]);
   const tags = [];
   for (const i of order) {
     if (tags.length >= 3) break;
+    if (!usable.has(KEYS[i])) continue;
     if (r.importance[i] < 0.085 || (r.support?.[i] ?? 0) < 3) continue;
     const f = FEATURES[i], m = r.m[i];
     tags.push(m > 0.62 ? f.highTag : m < 0.38 ? f.lowTag : `中間の${f.name}`);
@@ -333,8 +342,10 @@ function renderResult(r) {
 
   // 上位項目をタグで見せる（説明文の代わり）。
   // 重視度がほぼ0の項目を並べても意味がないので、目立つものだけ出す。
-  const shown = order.filter((i) => r.importance[i] >= 0.05).slice(0, 3);
-  $('result-tags').innerHTML = (shown.length ? shown : order.slice(0, 1)).map((i, n) =>
+  const usable = usableOf(r);
+  const shown = order.filter((i) => usable.has(KEYS[i]) && r.importance[i] >= 0.05).slice(0, 3);
+  const fallback = order.filter((i) => usable.has(KEYS[i])).slice(0, 1);
+  $('result-tags').innerHTML = (shown.length ? shown : fallback).map((i, n) =>
     `<span class="tag" style="--i:${n}">${featureIcon(KEYS[i])}${FEATURES[i].name}
        <b>${Math.round(r.importance[i] * 100)}%</b></span>`).join('');
 
@@ -390,7 +401,7 @@ function countUp(el, target, ms = 1100) {
 
 /** きれい系 ⇔ かわいい系 のどちらに寄っているか */
 function renderStyle(r) {
-  const { score, basis, top } = cuteScore(r.m, r.importance);
+  const { score, basis, top } = cuteScore(r.m, r.importance, usableOf(r));
   const cute = score > 0;
   const strength = Math.abs(score);
   // 根拠が薄いとき（髪や肌ばかり見ている人）は言い切らない
@@ -412,7 +423,7 @@ function renderStyle(r) {
 
 /** 顔のどこを見て決めているか。顔の絵とパーツ別の割合で見せる */
 function renderFaceMap(r) {
-  const shares = partShares(r.importance);
+  const shares = partShares(r.importance, usableOf(r));
   $('facemap-list').innerHTML = shares.map((p, n) => `
     <li style="--i:${n}">
       <span class="fm-name">${p.name}</span>
@@ -422,15 +433,33 @@ function renderFaceMap(r) {
 }
 
 function renderFeatures(r) {
-  const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]);
-  const max = Math.max(...r.importance);
+  const can = usableOf(r);
+  const order = KEYS.map((_, i) => i).sort((a, b) => {
+    const ua = can.has(KEYS[a]) ? 1 : 0, ub = can.has(KEYS[b]) ? 1 : 0;
+    if (ua !== ub) return ub - ua;           // 判定できる項目を先に
+    return r.importance[b] - r.importance[a];
+  });
+  const max = Math.max(...KEYS.map((k, i) => (can.has(k) ? r.importance[i] : 0)), 1e-6);
   // 重視度が低くても上位6件は必ず見せる（1項目だけだと結果が読み取りにくいため）
-  const nStrong = Math.max(6, order.filter((i) => r.importance[i] >= 0.05).length);
+  const nStrong = Math.max(6, order.filter((i) => can.has(KEYS[i]) && r.importance[i] >= 0.05).length);
   const strong = order.slice(0, nStrong);
   const weak = order.slice(nStrong);
 
+  const usable = usableOf(r);
   const row = (i, n) => {
     const f = FEATURES[i], m = r.m[i], imp = r.importance[i];
+    // 同梱の顔どうしで差が小さい項目は、値が出ても根拠がない。
+    // 隠さずに「判定できない」と書いて区別する。
+    if (!usable.has(f.key)) {
+      return `<div class="feat is-unmeasurable" style="--i:${n}">
+        <div class="feat-head">
+          ${featureIcon(f.key)}
+          <span class="feat-name">${f.name}</span>
+          <span class="feat-note">判定できません</span>
+        </div>
+        <p class="card-note">同梱の顔どうしで差が小さく、好みを読み取れません</p>
+      </div>`;
+    }
     return `<div class="feat${imp < 0.05 ? ' is-weak' : ''}" style="--i:${n}">
       <div class="feat-head">
         ${featureIcon(f.key)}
@@ -460,11 +489,13 @@ function renderFeatures(r) {
 }
 
 async function copyResult(r) {
-  const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]).slice(0, 3);
-  const { score, basis } = cuteScore(r.m, r.importance);
+  const usable = usableOf(r);
+  const order = KEYS.map((_, i) => i).filter((i) => usable.has(KEYS[i]))
+    .sort((a, b) => r.importance[b] - r.importance[a]).slice(0, 3);
+  const { score, basis } = cuteScore(r.m, r.importance, usable);
   const style = basis < 0.35 || Math.abs(score) < 0.12 ? 'どちらも同じくらい'
     : `${Math.abs(score) >= 0.45 ? 'はっきり' : 'どちらかといえば'}${score > 0 ? 'かわいい系' : 'きれい系'}`;
-  const parts = partShares(r.importance).slice(0, 3);
+  const parts = partShares(r.importance, usable).slice(0, 3);
   const text = [
     '【顔の好み診断】',
     `私のタイプ → ${typeName(r)}`,
