@@ -140,6 +140,49 @@ const STRONG_PHRASES = {
   hairLength:  ['a very short pixie cut', 'very long hair past the chest'],
 };
 
+// 顔の「型」。パーツを個別に指定しても生成器は動かない
+// （「細い目」と書いても、かわいい顔の正解値から離れない）。
+// 型ごと指定すると顔全体の骨格が入れ替わるので、かわいさを保ったまま散らせる。
+// どれも「かわいい／きれい」の範囲にある、日本で通じる顔の型を並べている。
+const ARCHETYPES = [
+  { ja: 'たぬき顔', en: 'the tanuki type — a round soft baby face, large round eyes set slightly wide apart, full rounded cheeks, a small button nose' },
+  { ja: '猫顔',     en: 'the cat type — a small slim face, sharply upturned almond eyes, a pointed chin, thin defined lips' },
+  { ja: '狐顔',     en: 'the fox type — a long slender face, narrow slanted eyes, a high thin nose bridge, a sharp jawline' },
+  { ja: '犬顔',     en: 'the puppy type — a soft rounded face, gently downturned large eyes, a small rounded nose, a short lower face' },
+  { ja: '童顔',     en: 'the baby-faced type — a very short lower face, a high forehead, large round eyes sitting low, full soft cheeks' },
+  { ja: '正統派美人', en: 'the classic beauty type — a well-balanced oval face, calm almond eyes, a straight slender nose, softly arched eyebrows' },
+  { ja: 'クール系', en: 'the cool beauty type — a long narrow face, upturned narrow eyes, straight flat eyebrows, thin lips, a sharp chin' },
+  { ja: 'おっとり系', en: 'the gentle type — a wide soft face, wide-set gentle downturned eyes, a small low nose, full plump lips' },
+  { ja: '韓国アイドル風', en: 'the K-pop idol type — a very small face, straight flat eyebrows, large glassy eyes, a small pointed chin, a low soft nose' },
+  { ja: '彫り深め', en: 'the deep-featured type — deep-set eyes under a defined brow ridge, a high straight nose, a defined jawline' },
+];
+
+/**
+ * 顔の型をひと通り作らせるプロンプト。
+ * 型ごとに骨格が違うので、かわいさを保ったまま実測値が散る。
+ */
+function buildSpreadPrompts(n, opts) {
+  const rand = mulberry(opts.seed);
+  const vibe = VIBE[opts.vibe] ?? VIBE.idol;
+  const axes = opts.vibe === 'idol' ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES } : { ...AXES, ...EAST_ASIAN_AXES };
+  const hairBag = makeBag(axes.hair, rand);
+  const colorBag = makeBag(axes.hairColor, rand);
+  const ageBag = makeBag(AXES.age, rand);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const a = ARCHETYPES[i % ARCHETYPES.length];
+    // 同じ型でも髪と年齢は変える。型が2周目に入っても別人になるように。
+    const variation = `Japanese woman, ${ageBag()}, ${a.en}, ${hairBag()}, ${colorBag()}`
+      + ', still a strikingly pretty and cute face';
+    out.push({
+      index: i, gender: 'woman', why: `顔の型: ${a.ja}`,
+      variation,
+      text: `A ${FRAMING}. A ${vibe} ${variation}.`,
+    });
+  }
+  return out;
+}
+
 /**
  * 既存のプールを調べ、足りていない組み合わせを「目標」として並べる。
  * 精度が上がらない原因は主に2つある。
@@ -266,7 +309,7 @@ function buildFillPrompts(targets, n, opts) {
 }
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, spread: false, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -276,6 +319,7 @@ function parseArgs(argv) {
     else if (k === '--ethnicity') a.ethnicity = argv[++i];
     else if (k === '--vibe') a.vibe = argv[++i];
     else if (k === '--fill') a.fill = argv[++i] ?? 'data/faces.json';
+    else if (k === '--spread') a.spread = true;
     else if (k === '--female-ratio') a.femaleRatio = Number(argv[++i]);
     else if (k === '--concurrency') a.concurrency = Number(argv[++i]);
     else if (k === '--seed') a.seed = Number(argv[++i]);
@@ -394,7 +438,13 @@ async function main() {
   }
 
   let prompts, fillNote = '';
-  if (args.fill) {
+  if (args.spread) {
+    prompts = buildSpreadPrompts(args.count, args);
+    fillNote = '顔の型をひと通り作って、実測値のばらつきを増やすための指定です。';
+    console.log(`顔の型 ${ARCHETYPES.length} 種類で ${args.count} 件のプロンプトを作ります:`);
+    for (const a of ARCHETYPES) console.log(`  - ${a.ja}`);
+    console.log();
+  } else if (args.fill) {
     const faces = JSON.parse(await fs.readFile(path.resolve(args.fill), 'utf8')).faces;
     const targets = planFill(faces);
     if (!targets.length) { console.log('補うべき弱点は見つかりませんでした。'); return; }
