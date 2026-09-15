@@ -30,12 +30,12 @@ export const LOOK_KEYS = ['skinTone', 'hairColor', 'hairLength'];
 export const FACE_KEYS = KEYS.filter((k) => !LOOK_KEYS.includes(k));
 export const FEATURE_BY_KEY = Object.fromEntries(FEATURES.map((f) => [f.key, f]));
 
-// 実測のばらつき（tools/noise-check.mjs で測った値）。
-// 同じ顔を少しずつ違う解像度で解析したときに値がどれだけ動くか。
-const NOISE = { faceLength:1.55e-3, jawSharp:9.68e-4, eyeSize:5.43e-4, eyeTilt:4.84e-4,
-  eyeDistance:5.24e-4, browEyeGap:2.31e-3, browAngle:2.18e-3, browArch:7.07e-4,
-  noseWidth:7.47e-4, mouthWidth:3.34e-3, lipThick:1.50e-3, skinTone:7.46e-1,
-  hairColor:1.59, hairLength:4.98e-3, ageLook:5.17e-1 };
+// 実測のばらつき。取り込み時に複数解像度で測って中央値を採ったあと、
+// 解像度の組を変えると値がどれだけ動くか（.cache/noise-robust.mjs で実測）。
+const NOISE = { faceLength:8.43e-4, jawSharp:4.21e-4, eyeSize:2.28e-4, eyeTilt:2.37e-4,
+  eyeDistance:3.35e-4, browEyeGap:1.49e-3, browAngle:1.02e-3, browArch:3.27e-4,
+  noseWidth:3.42e-4, mouthWidth:1.44e-3, lipThick:6.21e-4, skinTone:4.83e-1,
+  hairColor:5.02e-1, hairLength:8.14e-3, ageLook:2.42e-1 };
 
 // 「プール内の実測の幅 ÷ ノイズ2つ分」が何段階に見分けられるか。
 // これを下回る項目は、顔どうしの差が小さすぎて人の目にも見えない。

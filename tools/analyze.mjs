@@ -128,6 +128,45 @@ function debugOverlay(size, P0, geo, raw, ox, oy, scale, pix) {
   </svg>`);
 }
 
+// ランドマークは解像度をわずかに変えるだけで少し動く。
+// 1枚だけで測るとその揺れがそのまま測定ノイズになり、
+// 「顔ごとの差 ÷ ノイズ」で決まる見分けられる段階数が伸びない。
+// 近い解像度で何度か測って中央値を採ると、揺れが打ち消し合う。
+// 元画像が 1024px なので、拡大にならない範囲で散らす。
+const MEASURE_SIZES = [896, 944, 992, 1024];
+
+const median = (xs) => {
+  const v = xs.filter(Number.isFinite).sort((a, b) => a - b);
+  if (!v.length) return null;
+  return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
+};
+
+/** 複数の解像度で測り、項目ごとに中央値を返す。顔が1つの画像のみ対象。 */
+async function measureRobust(buf, minScore) {
+  const runs = [];
+  for (const size of MEASURE_SIZES) {
+    const png = await sharp(buf).removeAlpha()
+      .resize({ width: size, height: size, fit: 'inside', withoutEnlargement: true }).png().toBuffer();
+    const raw = await sharp(png).raw().toBuffer({ resolveWithObject: true });
+    const { width: W, height: H } = raw.info;
+    const t = tf.tensor3d(new Uint8Array(raw.data), [H, W, 3]);
+    let dets = [];
+    try { dets = await detect(t, minScore, false); } finally { t.dispose(); }
+    if (dets.length !== 1) continue;
+    const geo = measureGeometry(dets[0].landmarks.positions);
+    const pix = measurePixels(raw.data, W, H, geo, 3);
+    const o = {};
+    for (const [k, v] of Object.entries(geo)) if (!k.startsWith('_')) o[k] = v;
+    for (const [k, v] of Object.entries(pix)) if (!k.startsWith('_')) o[k] = v;
+    o.ageLook = dets[0].age;
+    runs.push(o);
+  }
+  if (runs.length < 3) return null;
+  const out = {};
+  for (const k of Object.keys(runs[0])) out[k] = median(runs.map((r) => r[k]));
+  return out;
+}
+
 /**
  * 検出した顔1つ分を、切り出し・特徴量の実測・書き出しまで行う。
  * 1枚の画像に複数の顔がある場合はこれを顔の数だけ呼ぶ。
@@ -174,6 +213,8 @@ async function extractFace(det, ctx) {
   for (const [k, v] of Object.entries(geo)) if (!k.startsWith('_')) raw[k] = v;
   for (const [k, v] of Object.entries(pix)) if (!k.startsWith('_')) raw[k] = v;
   raw.ageLook = det.age;
+  // 複数解像度で測れていれば、そちらの中央値を採る（切り出しは 1024px のまま）
+  if (ctx.robust) for (const [k, v] of Object.entries(ctx.robust)) if (Number.isFinite(v)) raw[k] = v;
 
   // 計測できなかった項目はプール中央の扱いになり、その顔だけ嘘の値が入る。
   // 黙って通すと気づけないので知らせる。
@@ -251,10 +292,13 @@ async function main() {
       if (!dets.length) { skipped++; console.log(`  [skip] 顔を検出できません: ${file}`); continue; }
 
       const baseId = path.basename(file, path.extname(file)).replace(/[^a-zA-Z0-9_-]/g, '') || `face${n}`;
+      // 顔が1つの画像は、複数解像度で測って中央値を採る（ノイズが下がる）
+      const robust = dets.length === 1 ? await measureRobust(buf, args.minScore) : null;
+
       for (const [k, det] of dets.entries()) {
         const id = dets.length > 1 ? `${baseId}_${k + 1}` : baseId;
         const label = dets.length > 1 ? `${file} の${k + 1}人目` : file;
-        const res = await extractFace(det, { workPng, W0, H0, id, source: file, args, outDir, debugDir });
+        const res = await extractFace(det, { workPng, W0, H0, id, source: file, args, outDir, debugDir, robust });
         if (res.face) {
           faces.push(res.face);
           if (res.missing?.length) {

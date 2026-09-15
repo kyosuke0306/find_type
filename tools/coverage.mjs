@@ -14,10 +14,10 @@ const raws = j.faces.map((f) => f.raw);
 const pool = normalizePool(j.faces);
 
 // 測定ノイズ（tools/noise-check.mjs の実測値）
-const NOISE = { faceLength:1.55e-3, jawSharp:9.68e-4, eyeSize:5.43e-4, eyeTilt:4.84e-4,
-  eyeDistance:5.24e-4, browEyeGap:2.31e-3, browAngle:2.18e-3, browArch:7.07e-4,
-  noseWidth:7.47e-4, mouthWidth:3.34e-3, lipThick:1.50e-3, skinTone:7.46e-1,
-  hairColor:1.59, hairLength:4.98e-3, ageLook:5.17e-1 };
+const NOISE = { faceLength:8.43e-4, jawSharp:4.21e-4, eyeSize:2.28e-4, eyeTilt:2.37e-4,
+  eyeDistance:3.35e-4, browEyeGap:1.49e-3, browAngle:1.02e-3, browArch:3.27e-4,
+  noseWidth:3.42e-4, mouthWidth:1.44e-3, lipThick:6.21e-4, skinTone:4.83e-1,
+  hairColor:5.02e-1, hairLength:8.14e-3, ageLook:2.42e-1 };
 
 console.log('項目ごとの状態');
 console.log('  項目            見分けられる段階数  分布の偏り（下/中/上）');
