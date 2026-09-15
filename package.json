@@ -15,7 +15,8 @@
     "trim-check": "node tools/trim-check.mjs",
     "pick": "node tools/pick.mjs",
     "feature-report": "node tools/feature-report.mjs",
-    "balance": "node tools/balance.mjs"
+    "balance": "node tools/balance.mjs",
+    "gap-check": "node tools/gap-check.mjs"
   },
   "devDependencies": {
     "@tensorflow/tfjs": "4.22.0",
