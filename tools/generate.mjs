@@ -20,12 +20,14 @@ const AXES = {
   brows: ['thick straight eyebrows', 'thin arched eyebrows', 'softly curved eyebrows', 'bold angular eyebrows'],
   nose: ['small button nose', 'straight narrow nose', 'wide rounded nose', 'high-bridged nose'],
   lips: ['thin lips', 'full plump lips', 'medium lips with defined cupid bow'],
-  hair: ['very short cropped hair', 'short hair above the ears', 'chin-length bob', 'shoulder-length hair', 'long hair past the chest'],
+  hair: ['a very short pixie cut', 'short hair above the ears', 'chin-length bob', 'shoulder-length hair', 'long hair past the chest'],
   hairColor: ['jet black hair', 'dark brown hair', 'light brown hair', 'ash grey hair', 'blonde hair'],
   skin: ['fair pale skin', 'light skin', 'medium olive skin', 'tan brown skin', 'deep brown skin'],
   // 18〜25歳。顔を好みで採点するアプリなので、未成年にあたる年齢は生成しない。
-  // 「顔立ちの印象」の軸を測るために、この幅の中で散らしている。
-  age: ['18 years old', '19 years old', '20 years old', '22 years old', '24 years old', '25 years old'],
+  // 「顔立ちの印象」の軸を測るために幅を持たせつつ、
+  // 大学生にあたる 18〜22歳を厚めにしている（同じ年齢を複数回入れて重みを付ける）。
+  age: ['18 years old', '19 years old', '19 years old', '20 years old', '20 years old',
+        '21 years old', '21 years old', '22 years old', '24 years old', '25 years old'],
 };
 
 const ETHNICITY = {
@@ -39,6 +41,9 @@ const ETHNICITY = {
 // 「deep brown skin の日本人」のような矛盾した指定を避けるため。
 // 生成する人物の雰囲気。--vibe で切り替える。
 const VIBE = {
+  // 既定。かわいい女子大学生を狙う。
+  // 「学生」と言っても服装は共通指定のグレーTシャツなので、顔つきと雰囲気で寄せる。
+  student: 'cute and pretty college student, youthful girlish and fresh-faced, soft gentle features, clear healthy skin, bare natural look',
   cute: 'cute and pretty, youthful and fresh-faced, clear healthy skin',
   neutral: '',
 };
@@ -79,10 +84,10 @@ const FILL_PHRASES = {
   noseWidth:   ['a narrow slender nose', 'a wide nose with broad nostrils'],
   mouthWidth:  ['a small narrow mouth', 'a wide mouth'],
   lipThick:    ['very thin lips', 'very full plump lips'],
-  ageLook:     ['18 years old, a very youthful girlish face', '25 years old, a composed grown-up face'],
+  ageLook:     ['18 years old, a very youthful girlish face like a first-year student', '25 years old, a composed grown-up face'],
   skinTone:    ['very fair porcelain skin', 'tanned skin'],
   hairColor:   ['jet black hair', 'dyed bleached blonde hair'],
-  hairLength:  ['very short cropped hair', 'very long hair past the chest'],
+  hairLength:  ['a very short pixie cut', 'very long hair past the chest'],
 };
 
 /**
@@ -135,7 +140,7 @@ function planFill(faces) {
 /** 目標を満たすプロンプトを作る。指定のない項目は適当に散らす。 */
 function buildFillPrompts(targets, n, opts) {
   const rand = mulberry(opts.seed);
-  const vibe = VIBE[opts.vibe] ?? VIBE.cute;
+  const vibe = VIBE[opts.vibe] ?? VIBE.student;
   const out = [];
   for (let i = 0; i < n; i++) {
     const tgt = targets[i % targets.length];
@@ -155,7 +160,7 @@ function buildFillPrompts(targets, n, opts) {
 }
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'cute', fill: null, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'student', fill: null, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -207,7 +212,7 @@ function buildPrompts(n, opts) {
       ? (rand() < 0.7 ? 'short hair above the ears' : pick.hair) : pick.hair;
     // variation = 顔ごとに変わる部分だけ。チャット形式ではこれだけを送れば足りる。
     const variation = `${who} ${gender}, ${pick.age}, ${pick.faceShape}, ${pick.eyes}, ${pick.brows}, ${pick.nose}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}`;
-    const vibe = VIBE[opts.vibe] ?? VIBE.cute;
+    const vibe = VIBE[opts.vibe] ?? VIBE.student;
     const who2 = vibe ? `${vibe} ${who}` : who;
     const text = `A ${FRAMING}. A ${who2} ${gender}, ${pick.age}, with a ${pick.faceShape}, ${pick.eyes}, ${pick.brows}, a ${pick.nose}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}.`;
     out.push({ index: i, gender, text, variation, attrs: { ...pick, hair, ethnicity: who } });
@@ -340,7 +345,7 @@ async function main() {
       `これから人物のポートレート写真を${prompts.length}枚つくります。毎回かならず次の条件を守ってください。`,
       '',
       FRAMING_PARTS.map((x) => `- ${x}`).join('\n'),
-      ...(VIBE[args.vibe] ?? VIBE.cute ? [`- ${VIBE[args.vibe] ?? VIBE.cute}`] : []),
+      ...(VIBE[args.vibe] ?? VIBE.student ? [`- ${VIBE[args.vibe] ?? VIBE.student}`] : []),
       '',
       'このあと人物の特徴を1行ずつ送ります。そのつど条件を満たす写真を1枚だけ生成してください。',
       '説明文は不要です。',
