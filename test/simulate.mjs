@@ -1,6 +1,7 @@
 // 好み推定モデルの検証。
 // 「本当の好み」を持つ仮想ユーザーに選択させ、その回答だけから好みを復元できるか測る。
 import fs from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import { KEYS, normalizePool } from '../src/features.js';
 import { fit, predict, choosePair, updateStats, newStats, utilityDelta } from '../src/model.js';
 const W = process.env.PW ? JSON.parse(process.env.PW) : undefined;
@@ -9,9 +10,7 @@ const W = process.env.PW ? JSON.parse(process.env.PW) : undefined;
 // 画像を追加したときに、そのプールで本当に精度が上がったかを見るため。
 const poolAt = process.argv.indexOf('--pool');
 const POOL_PATH = poolAt > 0 ? process.argv[poolAt + 1] : null;
-const REAL_POOL = POOL_PATH
-  ? normalizePool(JSON.parse(fs.readFileSync(POOL_PATH, 'utf8')).faces).map((f) => ({ id: f.file, v: f.v }))
-  : null;
+const POOL_FACES = POOL_PATH ? JSON.parse(fs.readFileSync(POOL_PATH, 'utf8')).faces : null;
 
 const mulberry = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const sigmoid = (z) => 1 / (1 + Math.exp(-z));
@@ -92,19 +91,34 @@ function evaluate(pool, user, model, rand) {
   return { acc: ok / n, hit, hit5, merr };
 }
 
-const POS = process.argv.slice(2).filter((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--pool');
-const ROUNDS = Number(POS[0] ?? 30);
-const TRIALS = Number(POS[1] ?? 60);
-for (const adaptive of [false, true]) {
+/**
+ * 仮想ユーザーに答えさせて、そのプールでどこまで当てられるかを測る。
+ * faces に data/faces.json の faces を渡すと実際の顔で測れる。
+ * 渡さなければ合成プールを使う。
+ */
+export function benchmark({ faces = null, rounds = 30, trials = 60, adaptive = true } = {}) {
+  const real = faces ? normalizePool(faces).map((f) => ({ id: f.file, v: f.v })) : null;
   const agg = { acc: 0, hit: 0, hit5: 0, merr: 0 };
-  for (let t = 0; t < TRIALS; t++) {
+  for (let t = 0; t < trials; t++) {
     const rand = mulberry(1000 + t);
-    const pool = REAL_POOL ?? makePool(160, rand);
+    const pool = real ?? makePool(160, rand);
     const user = makeUser(rand);
-    const model = runSession(pool, user, ROUNDS, rand, adaptive);
+    const model = runSession(pool, user, rounds, rand, adaptive);
     const e = evaluate(pool, user, model, rand);
     for (const k in agg) agg[k] += e[k];
   }
-  const f = (x) => (agg[x] / TRIALS).toFixed(3);
-  console.log(`${adaptive ? 'adaptive' : 'random  '} ${REAL_POOL ? `実プール${REAL_POOL.length}枚 ` : ''}rounds=${ROUNDS}  予測一致率=${f('acc')}  重要特徴Top3的中=${f('hit')}  Top5内=${f('hit5')}  理想値誤差=${f('merr')}`);
+  for (const k in agg) agg[k] /= trials;
+  return { ...agg, size: real ? real.length : 160 };
+}
+
+// 直接実行されたときだけ結果を表示する（他から import しても走らないように）
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const POS = process.argv.slice(2).filter((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--pool');
+  const ROUNDS = Number(POS[0] ?? 30);
+  const TRIALS = Number(POS[1] ?? 60);
+  for (const adaptive of [false, true]) {
+    const r = benchmark({ faces: POOL_FACES, rounds: ROUNDS, trials: TRIALS, adaptive });
+    const f = (x) => r[x].toFixed(3);
+    console.log(`${adaptive ? 'adaptive' : 'random  '} ${POOL_FACES ? `実プール${r.size}枚 ` : ''}rounds=${ROUNDS}  予測一致率=${f('acc')}  重要特徴Top3的中=${f('hit')}  Top5内=${f('hit5')}  理想値誤差=${f('merr')}`);
+  }
 }
