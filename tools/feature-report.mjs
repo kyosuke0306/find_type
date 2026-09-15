@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // 特徴項目ごとの「結果の出やすさ」と「当てやすさ」を測る。
 //
-//   node tools/feature-report.mjs [問数] [仮想ユーザー数]
+//   node tools/feature-report.mjs [問数] [仮想ユーザー数] [--pool data/faces.json]
 //
 // 仮想ユーザーは15項目のうち4項目を無作為に「重視する項目」として持つので、
 // どの項目も本当は 4/15 = 26.7% の人にとって重要。
@@ -28,9 +28,12 @@ const NOISE = { faceLength:8.43e-4, jawSharp:4.21e-4, eyeSize:2.28e-4, eyeTilt:2
 const mulberry = (a) => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const sigmoid = (z) => 1 / (1 + Math.exp(-z));
 
-const ROUNDS = Number(process.argv[2] ?? 45);
-const TRIALS = Number(process.argv[3] ?? 400);
-const faces = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/faces.json'), 'utf8')).faces;
+const POS = process.argv.slice(2).filter((a, i, all) => !a.startsWith('--') && all[i - 1] !== '--pool');
+const ROUNDS = Number(POS[0] ?? 45);
+const TRIALS = Number(POS[1] ?? 400);
+const poolAt = process.argv.indexOf('--pool');
+const POOL_PATH = poolAt > 0 ? process.argv[poolAt + 1] : 'data/faces.json';
+const faces = JSON.parse(fs.readFileSync(path.resolve(ROOT, POOL_PATH), 'utf8')).faces;
 const pool = normalizePool(faces);
 
 function makeUser(rand, nImportant = 4) {
@@ -84,7 +87,7 @@ const levels = (k) => {
 
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const BASE = 3 / KEYS.length; // どの項目も、本当は 3/15 = 20% の割合で上位3つに入るはず
-console.log(`${ROUNDS}問・仮想ユーザー${TRIALS}人・同梱プール${faces.length}枚`);
+console.log(`${ROUNDS}問・仮想ユーザー${TRIALS}人・${POOL_PATH} ${faces.length}枚`);
 console.log(`どの項目も本当は 1位 ${pct(1 / KEYS.length)} / 上位3つ ${pct(BASE)} の割合で出るのが公平な状態です。`);
 console.log('');
 console.log('項目        段階数   1位に出る  上位3つに出る   当てやすさ  確からしさ  かたより');

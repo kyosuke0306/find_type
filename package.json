@@ -14,7 +14,8 @@
     "coverage": "node tools/coverage.mjs",
     "trim-check": "node tools/trim-check.mjs",
     "pick": "node tools/pick.mjs",
-    "feature-report": "node tools/feature-report.mjs"
+    "feature-report": "node tools/feature-report.mjs",
+    "balance": "node tools/balance.mjs"
   },
   "devDependencies": {
     "@tensorflow/tfjs": "4.22.0",

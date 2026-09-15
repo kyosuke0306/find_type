@@ -325,24 +325,39 @@ async function finishSession() {
 /** 結果で言い切ってよい項目か（古い保存結果には情報がないので全部通す） */
 const usableOf = (r) => (r.usable ? new Set(r.usable) : new Set(KEYS));
 
-/** 重視度の高い特徴を並べてタイプ名にする */
-function typeName(r) {
+/**
+ * 効いていた特徴をまとめて、顔のタイプを一文で言う。
+ *
+ * 単語を「×」で並べるだけだと、何を見て決めているのかが伝わらない。
+ * 重視度の高い顔のパーツ2つを連体形でつなぎ、きれい系／かわいい系の判定を
+ * 添えて「〜顔がタイプ」という形にする。
+ * 言い切れる根拠がないときは、無理に決めつけない文にする。
+ */
+function typePhrase(r) {
   const usable = usableOf(r);
   const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]);
-  const tags = [];
+  const parts = [];
   for (const i of order) {
-    if (tags.length >= 3) break;
+    if (parts.length >= 2) break;
     if (!usable.has(KEYS[i]) || !FACE_KEYS.includes(KEYS[i])) continue;
     if (r.importance[i] < 0.085 || (r.support?.[i] ?? 0) < 3) continue;
     const f = FEATURES[i], m = r.m[i];
-    tags.push(m > 0.62 ? f.highTag : m < 0.38 ? f.lowTag : `中間の${f.name}`);
+    parts.push(m > 0.62 ? f.highPhrase : m < 0.38 ? f.lowPhrase : f.midPhrase);
   }
-  return tags.length ? tags.join(' × ') : '顔のパーツにはこだわり少なめ';
+
+  // きれい系／かわいい系は、根拠が薄いときは足さない（renderStyle と同じ条件）
+  const { score, basis } = cuteScore(r.m, r.importance, usable);
+  if (Math.abs(score) >= 0.12 && basis >= 0.35) {
+    parts.push(score > 0 ? 'かわいい系の' : 'きれい系の');
+  }
+
+  if (!parts.length) return 'パーツより全体の雰囲気で選ぶタイプ';
+  return `${parts.join('、')}顔がタイプ`;
 }
 
 function renderResult(r) {
   const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]);
-  $('result-title').textContent = typeName(r);
+  $('result-title').textContent = typePhrase(r);
 
   // 上位項目をタグで見せる（説明文の代わり）。
   // 重視度がほぼ0の項目を並べても意味がないので、目立つものだけ出す。
@@ -552,7 +567,7 @@ async function copyResult(r) {
   const parts = partShares(r.importance, usable).slice(0, 3);
   const text = [
     '【顔の好み診断】',
-    `私のタイプ → ${typeName(r)}`,
+    `私のタイプ → ${typePhrase(r)}`,
     `系統 → ${style}`,
     `よく見ている → ${parts.map((p) => `${p.name} ${Math.round(p.share * 100)}%`).join(' / ')}`,
     order.map((i) => `${FEATURES[i].name} ${Math.round(r.importance[i] * 100)}%`).join(' / '),

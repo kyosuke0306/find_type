@@ -10,7 +10,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { FEATURES, KEYS, normalizePool } from '../src/features.js';
+import { FEATURES, KEYS, FACE_KEYS, normalizePool } from '../src/features.js';
 
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 
@@ -189,6 +189,86 @@ function buildPlainPrompts(n, opts) {
 }
 
 /**
+ * 項目どうしの相関を切るためのプロンプト。
+ *
+ * 結果の出やすさが項目ごとに偏る原因は、実測で「項目どうしの相関」だと分かっている
+ * （最大相関と当てやすさの相関 -0.78。tools/feature-report.mjs と tools/balance.mjs）。
+ * 例えばプールの「眉と目の距離」と「眉の形」は r=0.83 で、
+ * 彫りが深い顔はだいたい平行眉、眉と目が離れた顔はだいたいアーチ眉になっている。
+ * これだとどちらを重視しているのか切り分けられない。
+ *
+ * そこで、強く相関している2項目を中央値で4分割し、空いている組み合わせだけを
+ * 名指しで作らせる。指定するのは必ず2項目だけ。
+ * 3つ以上重ねると顔が崩れることが分かっているため（README「かわいさを保ったまま〜」）。
+ */
+function buildDecorrelatePrompts(faces, n, opts) {
+  const rand = mulberry(opts.seed);
+  const vibe = VIBE[opts.vibe] ?? VIBE.idol;
+  const axes = opts.vibe === 'idol' ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES } : { ...AXES, ...EAST_ASIAN_AXES };
+  const hairBag = makeBag(axes.hair, rand);
+  const colorBag = makeBag(axes.hairColor, rand);
+  const ageBag = makeBag(AXES.age, rand);
+
+  const pear = (a, b) => {
+    const m = (x) => x.reduce((t, v) => t + v, 0) / x.length;
+    const ma = m(a), mb = m(b);
+    let num = 0, da = 0, db = 0;
+    for (let i = 0; i < a.length; i++) { const x = a[i] - ma, y = b[i] - mb; num += x * y; da += x * x; db += y * y; }
+    return num / (Math.sqrt(da * db) || 1);
+  };
+  const col = {};
+  for (const k of FACE_KEYS) col[k] = faces.map((f) => f.raw?.[k]).filter(Number.isFinite);
+  const med = (k) => { const xs = [...col[k]].sort((x, y) => x - y); return xs[Math.floor(xs.length / 2)]; };
+
+  const pairs = [];
+  for (let i = 0; i < FACE_KEYS.length; i++) {
+    for (let j = i + 1; j < FACE_KEYS.length; j++) {
+      const a = FACE_KEYS[i], b = FACE_KEYS[j];
+      if (!FILL_PHRASES[a] || !FILL_PHRASES[b]) continue;
+      const ok = faces.filter((f) => Number.isFinite(f.raw?.[a]) && Number.isFinite(f.raw?.[b]));
+      pairs.push({ a, b, r: pear(ok.map((f) => f.raw[a]), ok.map((f) => f.raw[b])), faces: ok });
+    }
+  }
+  pairs.sort((x, y) => Math.abs(y.r) - Math.abs(x.r));
+
+  // 相関の強い組から、空いている側だけを拾う
+  const targets = [];
+  for (const p of pairs.slice(0, 6)) {
+    const ma = med(p.a), mb = med(p.b);
+    const q = [[[], []], [[], []]];
+    for (const f of p.faces) q[f.raw[p.a] >= ma ? 1 : 0][f.raw[p.b] >= mb ? 1 : 0].push(f);
+    const cells = [[0, 0], [0, 1], [1, 0], [1, 1]].map(([i, j]) => ({ i, j, n: q[i][j].length }))
+      .sort((x, y) => x.n - y.n);
+    for (const c of cells.slice(0, 2)) {
+      if (c.n > p.faces.length / 6) continue;   // そこそこ埋まっているなら要らない
+      targets.push({ a: p.a, b: p.b, ai: c.i, bi: c.j, have: c.n, r: p.r });
+    }
+  }
+  if (!targets.length) return [];
+
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = targets[i % targets.length];
+    const pa = FILL_PHRASES[t.a][t.ai], pb = FILL_PHRASES[t.b][t.bi];
+    // FILL_PHRASES は冠詞まで含めて正しい形になっているので、そのまま並べる。
+    // 年齢は ageLook の指定と重なるので、そちらが対象のときは足さない。
+    const age = (t.a === 'ageLook' || t.b === 'ageLook') ? null : ageBag();
+    const variation = [`Japanese woman`, age, pa, pb, hairBag(), colorBag()]
+      .filter(Boolean).join(', ');
+    out.push({
+      index: i, gender: 'woman',
+      why: `${jaName(t.a)}(${jaSide(t.a, t.ai)}) × ${jaName(t.b)}(${jaSide(t.b, t.bi)})  いま${t.have}枚 / r=${t.r.toFixed(2)}`,
+      variation,
+      text: `A ${FRAMING}. A ${vibe} ${variation}, still a strikingly pretty and cute face.`,
+    });
+  }
+  return out;
+}
+
+const jaName = (k) => FEATURES[KEYS.indexOf(k)].name;
+const jaSide = (k, hi) => (hi ? FEATURES[KEYS.indexOf(k)].high : FEATURES[KEYS.indexOf(k)].low);
+
+/**
  * 顔の型をひと通り作らせるプロンプト。
  * 型ごとに骨格が違うので、かわいさを保ったまま実測値が散る。
  */
@@ -340,7 +420,7 @@ function buildFillPrompts(targets, n, opts) {
 }
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, spread: false, plain: false, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, spread: false, plain: false, decorrelate: null, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -351,6 +431,7 @@ function parseArgs(argv) {
     else if (k === '--vibe') a.vibe = argv[++i];
     else if (k === '--fill') a.fill = argv[++i] ?? 'data/faces.json';
     else if (k === '--spread') a.spread = true;
+    else if (k === '--decorrelate') a.decorrelate = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : 'data/faces.json';
     else if (k === '--plain') a.plain = true;
     else if (k === '--female-ratio') a.femaleRatio = Number(argv[++i]);
     else if (k === '--concurrency') a.concurrency = Number(argv[++i]);
@@ -470,7 +551,20 @@ async function main() {
   }
 
   let prompts, fillNote = '';
-  if (args.plain) {
+  if (args.decorrelate) {
+    const faces = JSON.parse(await fs.readFile(path.resolve(args.decorrelate), 'utf8')).faces;
+    prompts = buildDecorrelatePrompts(faces, args.count, args);
+    if (!prompts.length) {
+      console.log('切るべき強い相関は見つかりませんでした。');
+      return;
+    }
+    fillNote = '項目どうしの相関を切るための指定です。指定は必ず2項目だけにしています。';
+    const seen = new Map();
+    for (const p of prompts) seen.set(p.why, (seen.get(p.why) ?? 0) + 1);
+    console.log(`相関を切るためのプロンプトを ${prompts.length} 件作ります:`);
+    for (const [why, c] of seen) console.log(`  - ${why}  → ${c}件`);
+    console.log();
+  } else if (args.plain) {
     prompts = buildPlainPrompts(args.count, args);
     fillNote = 'かわいさだけを指定しています。顔のパーツは指定しません。'
       + '出来たものを取り込んだあと npm run pick で残す顔を選びます。';

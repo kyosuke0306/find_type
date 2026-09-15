@@ -4,22 +4,40 @@
 // 絶対値のままでは「大きい/小さい」の基準が決まらないため、
 // プール全体での順位（パーセンタイル）に変換して 0..1 の相対尺度にそろえる。
 
+// phrase は結果の見出しに使う連体形（「〜顔」に続けて読める形）。
+// タグ（lowTag/highTag）を並べるだけだと単語の羅列になるので、文として読める形を別に持つ。
+// mid は「その項目は中くらいが好き」と推定されたとき。
 export const FEATURES = [
-  { key: 'faceLength',  name: '輪郭の縦横比', low: '丸顔',       high: '面長',         lowTag: '丸顔',       highTag: '面長' },
-  { key: 'jawSharp',    name: 'あごのライン', low: '丸いあご',   high: 'シャープなあご', lowTag: 'ふんわり輪郭', highTag: 'シャープ輪郭' },
-  { key: 'eyeSize',     name: '目の大きさ',   low: '切れ長の目', high: 'ぱっちりした目', lowTag: '切れ長',     highTag: 'ぱっちり目' },
-  { key: 'eyeTilt',     name: '目尻の角度',   low: 'タレ目',     high: 'ツリ目',       lowTag: 'タレ目',     highTag: 'ツリ目' },
-  { key: 'eyeDistance', name: '目の間隔',     low: '求心顔（目が近い）', high: '遠心顔（目が離れ気味）', lowTag: '求心顔', highTag: '遠心顔' },
-  { key: 'browEyeGap',  name: '眉と目の距離', low: '彫りが深い（眉と目が近い）', high: '眉と目が離れている', lowTag: '彫り深め', highTag: '離れ眉' },
-  { key: 'browAngle',   name: '眉の角度',     low: '下がり眉',   high: '上がり眉',     lowTag: '下がり眉',   highTag: '上がり眉' },
-  { key: 'browArch',    name: '眉の形',       low: '平行眉',     high: 'アーチ眉',     lowTag: '平行眉',     highTag: 'アーチ眉' },
-  { key: 'noseWidth',   name: '小鼻の広さ',   low: 'シュッとした鼻', high: '小鼻がしっかりした鼻', lowTag: '細い鼻', highTag: 'しっかり鼻' },
-  { key: 'mouthWidth',  name: '口の大きさ',   low: '小さめの口', high: '大きめの口',   lowTag: 'おちょぼ口', highTag: '大きな口' },
-  { key: 'lipThick',    name: '唇の厚さ',     low: '薄い唇',     high: 'ぽってりした唇', lowTag: '薄い唇',   highTag: 'ぽってり唇' },
-  { key: 'ageLook',     name: '顔立ちの印象', low: '童顔',       high: '大人っぽい顔', lowTag: '童顔',       highTag: '大人顔' },
-  { key: 'skinTone',    name: '肌の明るさ',   low: '色白',       high: '小麦肌',       lowTag: '色白',       highTag: '小麦肌' },
-  { key: 'hairColor',   name: '髪の明るさ',   low: '黒髪',       high: '明るい髪',     lowTag: '黒髪',       highTag: '明るい髪' },
-  { key: 'hairLength',  name: '髪の長さ',     low: 'ショート',   high: 'ロング',       lowTag: 'ショート',   highTag: 'ロング' },
+  { key: 'faceLength',  name: '輪郭の縦横比', low: '丸顔',       high: '面長',         lowTag: '丸顔',       highTag: '面長',
+    lowPhrase: '丸みのある', midPhrase: '輪郭のバランスが整った', highPhrase: '面長の' },
+  { key: 'jawSharp',    name: 'あごのライン', low: '丸いあご',   high: 'シャープなあご', lowTag: 'ふんわり輪郭', highTag: 'シャープ輪郭',
+    lowPhrase: 'あごのふんわりした', midPhrase: 'あごのラインが自然な', highPhrase: 'あごのラインがシャープな' },
+  { key: 'eyeSize',     name: '目の大きさ',   low: '切れ長の目', high: 'ぱっちりした目', lowTag: '切れ長',     highTag: 'ぱっちり目',
+    lowPhrase: '目の切れ長な', midPhrase: '目の大きさがほどよい', highPhrase: '目のぱっちりした' },
+  { key: 'eyeTilt',     name: '目尻の角度',   low: 'タレ目',     high: 'ツリ目',       lowTag: 'タレ目',     highTag: 'ツリ目',
+    lowPhrase: '目尻の下がった', midPhrase: '目尻の角度が自然な', highPhrase: '目尻の上がった' },
+  { key: 'eyeDistance', name: '目の間隔',     low: '求心顔（目が近い）', high: '遠心顔（目が離れ気味）', lowTag: '求心顔', highTag: '遠心顔',
+    lowPhrase: '目と目の近い', midPhrase: '目の間隔がほどよい', highPhrase: '目と目の離れた' },
+  { key: 'browEyeGap',  name: '眉と目の距離', low: '彫りが深い（眉と目が近い）', high: '眉と目が離れている', lowTag: '彫り深め', highTag: '離れ眉',
+    lowPhrase: '眉と目が近く彫りの深い', midPhrase: '眉と目の距離がほどよい', highPhrase: '眉と目の離れた' },
+  { key: 'browAngle',   name: '眉の角度',     low: '下がり眉',   high: '上がり眉',     lowTag: '下がり眉',   highTag: '上がり眉',
+    lowPhrase: '眉の下がった', midPhrase: '眉の角度が自然な', highPhrase: '眉の上がった' },
+  { key: 'browArch',    name: '眉の形',       low: '平行眉',     high: 'アーチ眉',     lowTag: '平行眉',     highTag: 'アーチ眉',
+    lowPhrase: '眉の平行な', midPhrase: '眉の形が自然な', highPhrase: '眉がアーチを描く' },
+  { key: 'noseWidth',   name: '小鼻の広さ',   low: 'シュッとした鼻', high: '小鼻がしっかりした鼻', lowTag: '細い鼻', highTag: 'しっかり鼻',
+    lowPhrase: '鼻筋のすっとした', midPhrase: '鼻の印象がほどよい', highPhrase: '小鼻のしっかりした' },
+  { key: 'mouthWidth',  name: '口の大きさ',   low: '小さめの口', high: '大きめの口',   lowTag: 'おちょぼ口', highTag: '大きな口',
+    lowPhrase: '口の小さな', midPhrase: '口の大きさがほどよい', highPhrase: '口の大きな' },
+  { key: 'lipThick',    name: '唇の厚さ',     low: '薄い唇',     high: 'ぽってりした唇', lowTag: '薄い唇',   highTag: 'ぽってり唇',
+    lowPhrase: '唇の薄い', midPhrase: '唇の厚さがほどよい', highPhrase: '唇のぽってりした' },
+  { key: 'ageLook',     name: '顔立ちの印象', low: '童顔',       high: '大人っぽい顔', lowTag: '童顔',       highTag: '大人顔',
+    lowPhrase: '顔立ちの幼い', midPhrase: '年齢の印象が中間の', highPhrase: '顔立ちの大人びた' },
+  { key: 'skinTone',    name: '肌の明るさ',   low: '色白',       high: '小麦肌',       lowTag: '色白',       highTag: '小麦肌',
+    lowPhrase: '色白の', midPhrase: '肌の明るさがほどよい', highPhrase: '小麦肌の' },
+  { key: 'hairColor',   name: '髪の明るさ',   low: '黒髪',       high: '明るい髪',     lowTag: '黒髪',       highTag: '明るい髪',
+    lowPhrase: '黒髪の', midPhrase: '髪の明るさがほどよい', highPhrase: '明るい髪の' },
+  { key: 'hairLength',  name: '髪の長さ',     low: 'ショート',   high: 'ロング',       lowTag: 'ショート',   highTag: 'ロング',
+    lowPhrase: 'ショートヘアの', midPhrase: '髪の長さがほどよい', highPhrase: 'ロングヘアの' },
 ];
 
 export const KEYS = FEATURES.map((f) => f.key);

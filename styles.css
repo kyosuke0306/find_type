@@ -272,7 +272,9 @@ code {
 /* ---------- 結果 ---------- */
 .result-kicker { text-align: center; color: var(--ink-dim); font-size: .82rem; margin: 12px 0 0; }
 .result-title {
-  text-align: center; font-size: 1.5rem; margin: 4px 0 10px;
+  /* 単語ではなく一文が入るので、幅に応じて縮め、折り返しても読めるようにする */
+  text-align: center; font-size: clamp(1.05rem, 4.6vw, 1.45rem); line-height: 1.5;
+  margin: 4px auto 10px; max-width: 22em; text-wrap: balance;
   animation: pop .6s cubic-bezier(.2,1.3,.4,1) both;
 }
 .result-tags { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 20px; }
@@ -376,7 +378,6 @@ code {
 .actions { margin-top: 20px; }
 
 @media (max-width: 400px) {
-  .result-title { font-size: 1.28rem; }
   .track { width: 68px; }
   .pole { font-size: .68rem; }
   .consistency-card { gap: 12px; }
