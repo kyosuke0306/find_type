@@ -55,84 +55,6 @@
       }
     },
     {
-      "id": "f04",
-      "file": "f04.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "male",
-      "age": 19.8,
-      "detScore": 0.993,
-      "raw": {
-        "faceLength": 0.8162,
-        "jawSharp": -0.66415,
-        "eyeSize": 0.12675,
-        "eyeTilt": 0.02739,
-        "eyeDistance": 0.26798,
-        "browEyeGap": 0.34997,
-        "browAngle": -0.06513,
-        "browArch": 0.10544,
-        "noseWidth": 0.35687,
-        "mouthWidth": 0.79173,
-        "lipThick": 0.24078,
-        "skinTone": -82.03447,
-        "hairColor": 121.53392,
-        "hairLength": 0.57403,
-        "ageLook": 19.79151
-      }
-    },
-    {
-      "id": "f05",
-      "file": "f05.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "male",
-      "age": 14.9,
-      "detScore": 0.996,
-      "raw": {
-        "faceLength": 0.79517,
-        "jawSharp": -0.66699,
-        "eyeSize": 0.11481,
-        "eyeTilt": 0.01784,
-        "eyeDistance": 0.2718,
-        "browEyeGap": 0.33595,
-        "browAngle": -0.06852,
-        "browArch": 0.1019,
-        "noseWidth": 0.35875,
-        "mouthWidth": 0.80187,
-        "lipThick": 0.22576,
-        "skinTone": -152.69122,
-        "hairColor": 179.54535,
-        "hairLength": 0,
-        "ageLook": 14.86042
-      }
-    },
-    {
-      "id": "f09",
-      "file": "f09.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "female",
-      "age": 23,
-      "detScore": 0.974,
-      "raw": {
-        "faceLength": 0.79118,
-        "jawSharp": -0.6663,
-        "eyeSize": 0.12674,
-        "eyeTilt": 0.02314,
-        "eyeDistance": 0.27283,
-        "browEyeGap": 0.32718,
-        "browAngle": -0.06225,
-        "browArch": 0.10544,
-        "noseWidth": 0.3498,
-        "mouthWidth": 0.77406,
-        "lipThick": 0.23328,
-        "skinTone": -110.84975,
-        "hairColor": 155.41473,
-        "hairLength": 1.5076,
-        "ageLook": 23.01534
-      }
-    },
-    {
       "id": "f10",
       "file": "f10.jpg",
       "gender": "female",
@@ -156,58 +78,6 @@
         "hairColor": 106.33443,
         "hairLength": 0.43218,
         "ageLook": 20.09412
-      }
-    },
-    {
-      "id": "f12",
-      "file": "f12.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "female",
-      "age": 24.5,
-      "detScore": 0.998,
-      "raw": {
-        "faceLength": 0.79833,
-        "jawSharp": -0.67557,
-        "eyeSize": 0.1186,
-        "eyeTilt": 0.02065,
-        "eyeDistance": 0.27001,
-        "browEyeGap": 0.34445,
-        "browAngle": -0.07269,
-        "browArch": 0.1053,
-        "noseWidth": 0.35814,
-        "mouthWidth": 0.81753,
-        "lipThick": 0.22521,
-        "skinTone": -156.45566,
-        "hairColor": 104.4594,
-        "hairLength": 0.36119,
-        "ageLook": 24.46734
-      }
-    },
-    {
-      "id": "f13",
-      "file": "f13.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "female",
-      "age": 18.1,
-      "detScore": 0.99,
-      "raw": {
-        "faceLength": 0.82536,
-        "jawSharp": -0.66917,
-        "eyeSize": 0.12569,
-        "eyeTilt": 0.02051,
-        "eyeDistance": 0.27551,
-        "browEyeGap": 0.3495,
-        "browAngle": -0.076,
-        "browArch": 0.10996,
-        "noseWidth": 0.34559,
-        "mouthWidth": 0.75158,
-        "lipThick": 0.24522,
-        "skinTone": -72.43267,
-        "hairColor": 117.34308,
-        "hairLength": 0.58857,
-        "ageLook": 18.11102
       }
     },
     {
@@ -312,32 +182,6 @@
         "hairColor": 152.86977,
         "hairLength": 0.39283,
         "ageLook": 17.73235
-      }
-    },
-    {
-      "id": "f22",
-      "file": "f22.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "female",
-      "age": 24.9,
-      "detScore": 0.973,
-      "raw": {
-        "faceLength": 0.82764,
-        "jawSharp": -0.65413,
-        "eyeSize": 0.12902,
-        "eyeTilt": 0.02768,
-        "eyeDistance": 0.27339,
-        "browEyeGap": 0.34431,
-        "browAngle": -0.05549,
-        "browArch": 0.10799,
-        "noseWidth": 0.34665,
-        "mouthWidth": 0.7374,
-        "lipThick": 0.23659,
-        "skinTone": -98.58995,
-        "hairColor": 159.73913,
-        "hairLength": 0.82788,
-        "ageLook": 24.89901
       }
     },
     {
@@ -471,32 +315,6 @@
       }
     },
     {
-      "id": "f32",
-      "file": "f32.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "female",
-      "age": 18.1,
-      "detScore": 0.992,
-      "raw": {
-        "faceLength": 0.77027,
-        "jawSharp": -0.66301,
-        "eyeSize": 0.12066,
-        "eyeTilt": 0.02685,
-        "eyeDistance": 0.26612,
-        "browEyeGap": 0.34803,
-        "browAngle": -0.06436,
-        "browArch": 0.10579,
-        "noseWidth": 0.34967,
-        "mouthWidth": 0.7514,
-        "lipThick": 0.23738,
-        "skinTone": -174.9688,
-        "hairColor": 151.07225,
-        "hairLength": 0.68532,
-        "ageLook": 18.1139
-      }
-    },
-    {
       "id": "n1",
       "file": "f33.jpg",
       "gender": "female",
@@ -627,32 +445,6 @@
       }
     },
     {
-      "id": "n1",
-      "file": "f40.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "male",
-      "age": 16,
-      "detScore": 0.989,
-      "raw": {
-        "faceLength": 0.77844,
-        "jawSharp": -0.65835,
-        "eyeSize": 0.12268,
-        "eyeTilt": 0.02729,
-        "eyeDistance": 0.26987,
-        "browEyeGap": 0.32096,
-        "browAngle": -0.04706,
-        "browArch": 0.10017,
-        "noseWidth": 0.35272,
-        "mouthWidth": 0.77211,
-        "lipThick": 0.2179,
-        "skinTone": -184.22618,
-        "hairColor": 26.66196,
-        "hairLength": 0,
-        "ageLook": 16.01052
-      }
-    },
-    {
       "id": "n2",
       "file": "f41.jpg",
       "gender": "female",
@@ -676,32 +468,6 @@
         "hairColor": 107.22189,
         "hairLength": 0.71485,
         "ageLook": 14.95029
-      }
-    },
-    {
-      "id": "n3",
-      "file": "f42.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "female",
-      "age": 19.7,
-      "detScore": 0.992,
-      "raw": {
-        "faceLength": 0.81082,
-        "jawSharp": -0.65954,
-        "eyeSize": 0.13177,
-        "eyeTilt": 0.03135,
-        "eyeDistance": 0.27607,
-        "browEyeGap": 0.34387,
-        "browAngle": -0.0512,
-        "browArch": 0.11114,
-        "noseWidth": 0.34597,
-        "mouthWidth": 0.76473,
-        "lipThick": 0.21163,
-        "skinTone": -77.1594,
-        "hairColor": 116.49389,
-        "hairLength": 1.02567,
-        "ageLook": 19.73406
       }
     },
     {
@@ -832,32 +598,6 @@
         "hairColor": 138.78224,
         "hairLength": 0.34073,
         "ageLook": 19.40616
-      }
-    },
-    {
-      "id": "n5",
-      "file": "f48.jpg",
-      "gender": "female",
-      "genderProbability": 1,
-      "detectedGender": "female",
-      "age": 16.5,
-      "detScore": 0.973,
-      "raw": {
-        "faceLength": 0.7767,
-        "jawSharp": -0.65596,
-        "eyeSize": 0.12787,
-        "eyeTilt": 0.035,
-        "eyeDistance": 0.27988,
-        "browEyeGap": 0.33446,
-        "browAngle": -0.03084,
-        "browArch": 0.105,
-        "noseWidth": 0.33885,
-        "mouthWidth": 0.74252,
-        "lipThick": 0.21758,
-        "skinTone": -99.88026,
-        "hairColor": 147.44156,
-        "hairLength": 1.07914,
-        "ageLook": 16.50948
       }
     }
   ]

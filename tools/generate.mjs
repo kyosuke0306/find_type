@@ -41,11 +41,27 @@ const ETHNICITY = {
 // 「deep brown skin の日本人」のような矛盾した指定を避けるため。
 // 生成する人物の雰囲気。--vibe で切り替える。
 const VIBE = {
-  // 既定。かわいい女子大学生を狙う。
-  // 「学生」と言っても服装は共通指定のグレーTシャツなので、顔つきと雰囲気で寄せる。
+  // 既定。アイドルや女優くらいのかわいさを狙う。
+  // 「かわいい人の中での好み」を診断するアプリなので、ここが基準線になる。
+  idol: 'strikingly beautiful and very cute, as pretty as a popular idol or actress, photogenic delicate features, flawless clear skin',
   student: 'cute and pretty college student, youthful girlish and fresh-faced, soft gentle features, clear healthy skin, bare natural look',
   cute: 'cute and pretty, youthful and fresh-faced, clear healthy skin',
   neutral: '',
+};
+
+// アイドル狙いのときに差し替える属性。
+// 診断は「かわいい人の中でどのタイプが好みか」を当てるものなので、
+// 軸のばらつきは残したまま、どれを選んでもかわいく見える言い回しにそろえる。
+// 例えば目の軸は「細い/大きい」の幅を保ちつつ、両端とも魅力的な表現にしている。
+// 冠詞は本文側で付けるので、ここには書かない。
+const IDOL_AXES = {
+  faceShape: ['round baby face', 'oval face', 'slim long face', 'heart-shaped face with a pointed chin', 'small V-line face'],
+  eyes: ['large round double-eyelid eyes', 'almond-shaped double-eyelid eyes', 'slightly upturned cat-like eyes', 'gently downturned puppy-like eyes', 'narrow elegant monolid eyes', 'wide-set doll-like eyes'],
+  brows: ['soft straight eyebrows', 'gently arched eyebrows', 'thin elegant eyebrows', 'natural slightly thick eyebrows'],
+  nose: ['small delicate nose', 'straight slender nose', 'slightly upturned button nose', 'high-bridged refined nose'],
+  lips: ['small thin lips', 'full plump lips', 'medium lips with a defined cupid bow'],
+  // 髪の明るさは既に明るい側に偏っているので、金髪は外す
+  hairColor: ['jet black hair', 'dark brown hair', 'dyed light brown hair', 'dyed ash brown hair'],
 };
 
 const EAST_ASIAN_AXES = {
@@ -64,7 +80,8 @@ const FRAMING_PARTS = [
   'soft even frontal lighting, no harsh shadows',
   'wearing a plain light grey crew-neck t-shirt',
   'sharp focus, photorealistic, 50mm lens, natural skin texture',
-  'no glasses, no hat, no jewelry, no visible makeup product, hair not covering the eyebrows',
+  // 化粧は許可する。ただし眉は実測するので前髪で隠さない。
+  'no glasses, no hat, no jewelry, natural everyday makeup, hair not covering the eyebrows',
   // 生成器は放っておくと同じ顔を髪型だけ変えて使い回す。毎回別人にさせる。
   'a completely different individual from the previous images, distinct facial structure',
 ];
@@ -72,21 +89,23 @@ const FRAMING = FRAMING_PARTS.join(', ');
 
 // 弱い項目を狙って埋めるときに使う、項目ごとの端の言い回し。
 // 診断項目とプロンプトの語を1対1で結びつけておく。
+// 両端とも「かわいい範囲での端」になる言い方にしている。
+// 「小鼻の広い顔」を素直に書くと狙いから外れた顔ができるため。
 const FILL_PHRASES = {
-  faceLength:  ['a round wide face', 'a long narrow face'],
-  jawSharp:    ['a soft rounded jawline', 'a sharp pointed chin'],
-  eyeSize:     ['narrow slit-like eyes', 'very large round eyes'],
-  eyeTilt:     ['droopy downturned outer eye corners', 'sharply upturned outer eye corners'],
-  eyeDistance: ['close-set eyes', 'wide-set eyes'],
+  faceLength:  ['a round wide baby face', 'a long slender face'],
+  jawSharp:    ['a soft rounded jawline', 'a sharp V-line chin'],
+  eyeSize:     ['narrow elegant slit eyes', 'very large round doll-like eyes'],
+  eyeTilt:     ['gently downturned puppy-like outer eye corners', 'sharply upturned cat-like outer eye corners'],
+  eyeDistance: ['close-set eyes', 'wide-set doll-like eyes'],
   browEyeGap:  ['eyebrows sitting very close to the eyes', 'eyebrows set high above the eyes'],
-  browAngle:   ['downward-slanting eyebrows', 'sharply upward-angled eyebrows'],
+  browAngle:   ['softly downward-slanting eyebrows', 'sharply upward-angled eyebrows'],
   browArch:    ['straight flat eyebrows', 'strongly arched eyebrows'],
-  noseWidth:   ['a narrow slender nose', 'a wide nose with broad nostrils'],
-  mouthWidth:  ['a small narrow mouth', 'a wide mouth'],
-  lipThick:    ['very thin lips', 'very full plump lips'],
-  ageLook:     ['18 years old, a very youthful girlish face like a first-year student', '25 years old, a composed grown-up face'],
-  skinTone:    ['very fair porcelain skin', 'tanned skin'],
-  hairColor:   ['jet black hair', 'dyed bleached blonde hair'],
+  noseWidth:   ['a narrow slender nose', 'a softly rounded wide nose'],
+  mouthWidth:  ['a small delicate mouth', 'a wide expressive mouth'],
+  lipThick:    ['thin delicate lips', 'very full plump lips'],
+  ageLook:     ['18 years old, a very youthful girlish face', '25 years old, a composed grown-up face'],
+  skinTone:    ['very fair porcelain skin', 'lightly tanned glowing skin'],
+  hairColor:   ['jet black hair', 'dyed light brown hair'],
   hairLength:  ['a very short pixie cut', 'very long hair past the chest'],
 };
 
@@ -140,7 +159,7 @@ function planFill(faces) {
 /** 目標を満たすプロンプトを作る。指定のない項目は適当に散らす。 */
 function buildFillPrompts(targets, n, opts) {
   const rand = mulberry(opts.seed);
-  const vibe = VIBE[opts.vibe] ?? VIBE.student;
+  const vibe = VIBE[opts.vibe] ?? VIBE.idol;
   const out = [];
   for (let i = 0; i < n; i++) {
     const tgt = targets[i % targets.length];
@@ -160,7 +179,7 @@ function buildFillPrompts(targets, n, opts) {
 }
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'student', fill: null, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -200,7 +219,8 @@ function makeBag(list, rand) {
 function buildPrompts(n, opts) {
   const rand = mulberry(opts.seed);
   const eth = ETHNICITY[opts.ethnicity] ?? ETHNICITY.japanese;
-  const axes = ['japanese', 'eastasian'].includes(opts.ethnicity) ? { ...AXES, ...EAST_ASIAN_AXES } : AXES;
+  let axes = ['japanese', 'eastasian'].includes(opts.ethnicity) ? { ...AXES, ...EAST_ASIAN_AXES } : AXES;
+  if (opts.vibe === 'idol') axes = { ...axes, ...IDOL_AXES };
   const bags = Object.fromEntries(Object.entries(axes).map(([k, v]) => [k, makeBag(v, rand)]));
   const ethBag = makeBag(eth, rand);
   const out = [];
@@ -212,9 +232,10 @@ function buildPrompts(n, opts) {
       ? (rand() < 0.7 ? 'short hair above the ears' : pick.hair) : pick.hair;
     // variation = 顔ごとに変わる部分だけ。チャット形式ではこれだけを送れば足りる。
     const variation = `${who} ${gender}, ${pick.age}, ${pick.faceShape}, ${pick.eyes}, ${pick.brows}, ${pick.nose}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}`;
-    const vibe = VIBE[opts.vibe] ?? VIBE.student;
+    const vibe = VIBE[opts.vibe] ?? VIBE.idol;
     const who2 = vibe ? `${vibe} ${who}` : who;
-    const text = `A ${FRAMING}. A ${who2} ${gender}, ${pick.age}, with a ${pick.faceShape}, ${pick.eyes}, ${pick.brows}, a ${pick.nose}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}.`;
+    const an = (w) => `${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`;
+    const text = `A ${FRAMING}. A ${who2} ${gender}, ${pick.age}, with ${an(pick.faceShape)}, ${pick.eyes}, ${pick.brows}, ${an(pick.nose)}, ${pick.lips}, ${hair}, ${pick.hairColor}, ${pick.skin}.`;
     out.push({ index: i, gender, text, variation, attrs: { ...pick, hair, ethnicity: who } });
   }
   return out;
@@ -345,7 +366,7 @@ async function main() {
       `これから人物のポートレート写真を${prompts.length}枚つくります。毎回かならず次の条件を守ってください。`,
       '',
       FRAMING_PARTS.map((x) => `- ${x}`).join('\n'),
-      ...(VIBE[args.vibe] ?? VIBE.student ? [`- ${VIBE[args.vibe] ?? VIBE.student}`] : []),
+      ...(VIBE[args.vibe] ?? VIBE.idol ? [`- ${VIBE[args.vibe] ?? VIBE.idol}`] : []),
       '',
       'このあと人物の特徴を1行ずつ送ります。そのつど条件を満たす写真を1枚だけ生成してください。',
       '説明文は不要です。',
