@@ -89,24 +89,26 @@ const FRAMING = FRAMING_PARTS.join(', ');
 
 // 弱い項目を狙って埋めるときに使う、項目ごとの端の言い回し。
 // 診断項目とプロンプトの語を1対1で結びつけておく。
-// 両端とも「かわいい範囲での端」になる言い方にしている。
-// 「小鼻の広い顔」を素直に書くと狙いから外れた顔ができるため。
+//
+// 「very」「strongly」のような強調は付けない。
+// 強調すると顔が崩れて、かわいい人を見るという目的から外れる。
+// 実測値はプール内での相対順位なので、控えめな差でも軸は動く。
 const FILL_PHRASES = {
-  faceLength:  ['a round wide baby face', 'a long slender face'],
-  jawSharp:    ['a soft rounded jawline', 'a sharp V-line chin'],
-  eyeSize:     ['narrow elegant slit eyes', 'very large round doll-like eyes'],
-  eyeTilt:     ['gently downturned puppy-like outer eye corners', 'sharply upturned cat-like outer eye corners'],
-  eyeDistance: ['close-set eyes', 'wide-set doll-like eyes'],
-  browEyeGap:  ['eyebrows sitting very close to the eyes', 'eyebrows set high above the eyes'],
-  browAngle:   ['softly downward-slanting eyebrows', 'sharply upward-angled eyebrows'],
-  browArch:    ['straight flat eyebrows', 'strongly arched eyebrows'],
-  noseWidth:   ['a narrow slender nose', 'a softly rounded wide nose'],
-  mouthWidth:  ['a small delicate mouth', 'a wide expressive mouth'],
-  lipThick:    ['thin delicate lips', 'very full plump lips'],
-  ageLook:     ['18 years old, a very youthful girlish face', '25 years old, a composed grown-up face'],
+  faceLength:  ['a round face', 'a slightly long slender face'],
+  jawSharp:    ['a soft rounded jawline', 'a slim pointed chin'],
+  eyeSize:     ['narrow elegant eyes', 'large round eyes'],
+  eyeTilt:     ['slightly downturned outer eye corners', 'slightly upturned outer eye corners'],
+  eyeDistance: ['eyes set slightly close together', 'eyes set slightly wide apart'],
+  browEyeGap:  ['eyebrows sitting close to the eyes', 'eyebrows set a little high above the eyes'],
+  browAngle:   ['softly downward-slanting eyebrows', 'slightly upward-angled eyebrows'],
+  browArch:    ['straight eyebrows', 'gently arched eyebrows'],
+  noseWidth:   ['a narrow slender nose', 'a slightly wide softly rounded nose'],
+  mouthWidth:  ['a small delicate mouth', 'a slightly wide mouth'],
+  lipThick:    ['slim delicate lips', 'full plump lips'],
+  ageLook:     ['18 years old, a youthful girlish face', '25 years old, a composed grown-up face'],
   skinTone:    ['very fair porcelain skin', 'lightly tanned glowing skin'],
   hairColor:   ['jet black hair', 'dyed light brown hair'],
-  hairLength:  ['a very short pixie cut', 'very long hair past the chest'],
+  hairLength:  ['a short pixie cut', 'very long hair past the chest'],
 };
 
 /**
@@ -172,31 +174,40 @@ const PART_OF = {
   noseWidth: 'nose', mouthWidth: 'mouth', lipThick: 'mouth',
   ageLook: 'age', skinTone: 'skin', hairColor: 'hair', hairLength: 'hair',
 };
-// 狙い以外に足す指定の数。増やすと生成器が指示を取りこぼす。
-const EXTRA_SPECS = 3;
+// 狙い以外に足す指定の数。
+// 増やすと生成器が指示を取りこぼし、かわいさの指定も薄まる。
+const EXTRA_SPECS = 2;
 
 function buildFillPrompts(targets, n, opts) {
   const rand = mulberry(opts.seed);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
+  const axes = opts.vibe === 'idol' ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES } : { ...AXES, ...EAST_ASIAN_AXES };
   const out = [];
   for (let i = 0; i < n; i++) {
     const tgt = targets[i % targets.length];
     const set = { ...tgt.set };
-    // 狙いの2項目だけだと顔が似通うので、他の項目も少し振る。
-    // ただし狙いと同じ部位は触らない（打ち消し合うため）。
     const used = new Set(Object.keys(set).map((k) => PART_OF[k]));
-    const rest = KEYS.filter((k) => !(k in set) && !used.has(PART_OF[k]))
-      .sort(() => rand() - 0.5);
-    for (const k of rest) {
-      if (used.size >= new Set(Object.values(PART_OF)).size) break;
-      if (Object.keys(set).length - Object.keys(tgt.set).length >= EXTRA_SPECS) break;
-      if (used.has(PART_OF[k])) continue;
-      used.add(PART_OF[k]);
-      set[k] = rand() < 0.5 ? 0 : 1;
-    }
-    const age = set.ageLook !== undefined ? FILL_PHRASES.ageLook[set.ageLook] : AXES.age[Math.floor(rand() * AXES.age.length)];
+
+    // 狙いの項目だけを端に振る。
+    // 以前はここでも端の言い回しを足していたが、端を何本も重ねると
+    // 顔が崩れる。狙い以外は、どれを引いてもかわいく見える語彙から選ぶ。
     const phrases = KEYS.filter((k) => k !== 'ageLook' && k in set).map((k) => FILL_PHRASES[k][set[k]]);
-    const variation = `Japanese woman, ${age}, ${phrases.join(', ')}`;
+    const extras = [
+      ['eyes', 'eyes'], ['brows', 'brows'], ['shape', 'faceShape'],
+      ['nose', 'nose'], ['mouth', 'lips'], ['hair', 'hair'],
+    ].filter(([part]) => !used.has(part)).sort(() => rand() - 0.5).slice(0, EXTRA_SPECS);
+    // 属性の語には冠詞が付いていないので、単独で並べるときは補う
+    const an = (w) => (/^(a|an|the) /.test(w) ? w : `${/^[aeiou]/i.test(w) ? 'an' : 'a'} ${w}`);
+    for (const [part, axis] of extras) {
+      const list = axes[axis];
+      const w = list[Math.floor(rand() * list.length)];
+      phrases.push(['shape', 'nose'].includes(part) ? an(w) : w);
+    }
+    if (!used.has('hair')) phrases.push(axes.hairColor[Math.floor(rand() * axes.hairColor.length)]);
+
+    const age = set.ageLook !== undefined ? FILL_PHRASES.ageLook[set.ageLook] : AXES.age[Math.floor(rand() * AXES.age.length)];
+    // 条件を並べると美しさの指定が薄まるので、最後にもう一度念を押す
+    const variation = `Japanese woman, ${age}, ${phrases.join(', ')}, still a strikingly pretty and cute face`;
     out.push({
       index: i, gender: 'woman', why: tgt.why,
       variation,
