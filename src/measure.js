@@ -145,20 +145,30 @@ export function measurePixels(px, W, H, geo, stride = 3) {
     b: cheeks.reduce((s, c) => s + c.b, 0) / cheeks.length,
   } : { r: 200, g: 170, b: 150 };
 
-  // 背景色は四隅から推定（無地背景を想定）
+  // 背景色は四隅から推定（無地背景を想定）。
+  // ただし顔が大きく写っていると、下の隅に肩が入り込んで背景ではなくなる。
+  // 四隅の平均をそのまま使うと背景色が肩に引っ張られるので、
+  // 「多数派で一致している隅」だけを背景とみなす。
   const corners = [
     samplePatch(px, W, H, 4, 4, 4, stride), samplePatch(px, W, H, W - 5, 4, 4, stride),
     samplePatch(px, W, H, 4, H - 5, 4, stride), samplePatch(px, W, H, W - 5, H - 5, 4, stride),
   ].filter(Boolean);
-  const bg = corners.length ? {
-    r: corners.reduce((s, c) => s + c.r, 0) / corners.length,
-    g: corners.reduce((s, c) => s + c.g, 0) / corners.length,
-    b: corners.reduce((s, c) => s + c.b, 0) / corners.length,
-  } : { r: 255, g: 255, b: 255 };
+  const mean = (list) => ({
+    r: list.reduce((s, c) => s + c.r, 0) / list.length,
+    g: list.reduce((s, c) => s + c.g, 0) / list.length,
+    b: list.reduce((s, c) => s + c.b, 0) / list.length,
+  });
+  // 各隅について、それに近い隅がいくつあるかを数え、いちばん大きな集団を採る
+  let agree = [];
+  for (const c of corners) {
+    const near = corners.filter((o) => near2(o, c, 70));
+    if (near.length > agree.length) agree = near;
+  }
+  const bg = agree.length ? mean(agree) : { r: 255, g: 255, b: 255 };
 
   // 髪の長さは「髪色に近く、背景でも肌でもない画素」を数えて測るため、
-  // 背景が無地でないと成立しない。四隅がばらついていたら計測不能として扱う。
-  const plainBg = corners.length === 4 && corners.every((c) => near2(c, bg, 70));
+  // 背景が無地でないと成立しない。一致する隅が3つ未満なら計測不能として扱う。
+  const plainBg = agree.length >= 3;
 
   // 髪色の採取。頭の大きさは顔ごとに違うので固定距離では外すことがある。
   // 額の上から頭頂・こめかみへ順に探索し、「肌でも背景でもない」最初の点を髪とみなす。

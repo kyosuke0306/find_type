@@ -175,6 +175,10 @@ async function extractFace(det, ctx) {
   for (const [k, v] of Object.entries(pix)) if (!k.startsWith('_')) raw[k] = v;
   raw.ageLook = det.age;
 
+  // 計測できなかった項目はプール中央の扱いになり、その顔だけ嘘の値が入る。
+  // 黙って通すと気づけないので知らせる。
+  const missing = Object.entries(raw).filter(([, v]) => !Number.isFinite(v)).map(([k]) => k);
+
   if (debugDir) {
     await sharp(cropPng)
       .composite([{ input: debugOverlay(args.size, det.landmarks.positions, geo, raw, ox, oy, args.size / box, pix), top: 0, left: 0 }])
@@ -182,6 +186,7 @@ async function extractFace(det, ctx) {
   }
 
   return {
+    missing,
     face: {
       id, file: outName, source,
       // 自動判定はショートヘアの女性を男性と誤りやすいので、--gender で上書きできる
@@ -250,8 +255,12 @@ async function main() {
         const id = dets.length > 1 ? `${baseId}_${k + 1}` : baseId;
         const label = dets.length > 1 ? `${file} の${k + 1}人目` : file;
         const res = await extractFace(det, { workPng, W0, H0, id, source: file, args, outDir, debugDir });
-        if (res.face) faces.push(res.face);
-        else { skipped++; console.log(`  [skip] ${res.reason}: ${label}`); }
+        if (res.face) {
+          faces.push(res.face);
+          if (res.missing?.length) {
+            console.log(`  [注意] ${label}: ${res.missing.join(', ')} を計測できませんでした（この項目は中央値の扱いになります）`);
+          }
+        } else { skipped++; console.log(`  [skip] ${res.reason}: ${label}`); }
       }
 
       if ((n + 1) % 10 === 0 || n === files.length - 1) {

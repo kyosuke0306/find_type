@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-15T11:24:45.194Z",
-  "count": 32,
+  "generatedAt": "2026-09-15T12:22:22.504Z",
+  "count": 25,
   "faces": [
     {
       "id": "f01",
@@ -624,6 +624,32 @@
         "hairColor": 45.0204,
         "hairLength": 1.99316,
         "ageLook": 14.57091
+      }
+    },
+    {
+      "id": "n1",
+      "file": "f64.jpg",
+      "gender": "female",
+      "genderProbability": 1,
+      "detectedGender": "female",
+      "age": 21.6,
+      "detScore": 0.972,
+      "raw": {
+        "faceLength": 0.77261,
+        "jawSharp": -0.66019,
+        "eyeSize": 0.11876,
+        "eyeTilt": 0.02733,
+        "eyeDistance": 0.2718,
+        "browEyeGap": 0.32769,
+        "browAngle": -0.05222,
+        "browArch": 0.09639,
+        "noseWidth": 0.35411,
+        "mouthWidth": 0.78119,
+        "lipThick": 0.22232,
+        "skinTone": -185.26387,
+        "hairColor": 136.30367,
+        "hairLength": 0.88193,
+        "ageLook": 21.64508
       }
     }
   ]
