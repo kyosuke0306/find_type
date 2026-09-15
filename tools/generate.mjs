@@ -128,8 +128,9 @@ function planFill(faces) {
     const t1 = lo + range / 3, t2 = lo + range * 2 / 3;
     const low = xs.filter((x) => x < t1).length, high = xs.filter((x) => x >= t2).length;
     const even = xs.length / 3;
-    if (low < even * 0.6) targets.push({ why: `${FEATURES[i].name}の「${FEATURES[i].lowTag}」側が少ない`, set: { [k]: 0 } });
-    if (high < even * 0.6) targets.push({ why: `${FEATURES[i].name}の「${FEATURES[i].highTag}」側が少ない`, set: { [k]: 1 } });
+    // 深刻さ = その端がどれだけ空いているか（0 なら1枚もない）
+    if (low < even * 0.6) targets.push({ why: `${FEATURES[i].name}の「${FEATURES[i].lowTag}」側が少ない`, set: { [k]: 0 }, harm: 1 - low / even });
+    if (high < even * 0.6) targets.push({ why: `${FEATURES[i].name}の「${FEATURES[i].highTag}」側が少ない`, set: { [k]: 1 }, harm: 1 - high / even });
   }
 
   // 2. 相関している組
@@ -150,13 +151,30 @@ function planFill(faces) {
       targets.push({
         why: `${FEATURES[c.ia].name}と${FEATURES[c.ib].name}が相関(${c.r.toFixed(2)})していて切り分けられない`,
         set: { [c.a]: va, [c.b]: vb },
+        // 相関は2項目が丸ごと1本に潰れるので、端の不足より重く見る
+        harm: Math.abs(c.r) + 0.35,
       });
     }
   }
+  // 全部は作れないことが多いので、困っている順に並べる。
+  // 上から順に作れば、途中でやめても効きの大きいものが埋まる。
+  targets.sort((x, y) => y.harm - x.harm);
   return targets;
 }
 
 /** 目標を満たすプロンプトを作る。指定のない項目は適当に散らす。 */
+// 同じ部位を指す項目。狙い以外でここから2つ以上入れると
+// 「丸顔なのにシャープなあご」のような矛盾した指示になる。
+const PART_OF = {
+  faceLength: 'shape', jawSharp: 'shape',
+  eyeSize: 'eyes', eyeTilt: 'eyes', eyeDistance: 'eyes',
+  browEyeGap: 'brows', browAngle: 'brows', browArch: 'brows',
+  noseWidth: 'nose', mouthWidth: 'mouth', lipThick: 'mouth',
+  ageLook: 'age', skinTone: 'skin', hairColor: 'hair', hairLength: 'hair',
+};
+// 狙い以外に足す指定の数。増やすと生成器が指示を取りこぼす。
+const EXTRA_SPECS = 3;
+
 function buildFillPrompts(targets, n, opts) {
   const rand = mulberry(opts.seed);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
@@ -164,8 +182,18 @@ function buildFillPrompts(targets, n, opts) {
   for (let i = 0; i < n; i++) {
     const tgt = targets[i % targets.length];
     const set = { ...tgt.set };
-    // 指定のない項目は半分くらいをランダムに決める（全部入れると指示が長すぎる）
-    for (const k of KEYS) if (!(k in set) && rand() < 0.45) set[k] = rand() < 0.5 ? 0 : 1;
+    // 狙いの2項目だけだと顔が似通うので、他の項目も少し振る。
+    // ただし狙いと同じ部位は触らない（打ち消し合うため）。
+    const used = new Set(Object.keys(set).map((k) => PART_OF[k]));
+    const rest = KEYS.filter((k) => !(k in set) && !used.has(PART_OF[k]))
+      .sort(() => rand() - 0.5);
+    for (const k of rest) {
+      if (used.size >= new Set(Object.values(PART_OF)).size) break;
+      if (Object.keys(set).length - Object.keys(tgt.set).length >= EXTRA_SPECS) break;
+      if (used.has(PART_OF[k])) continue;
+      used.add(PART_OF[k]);
+      set[k] = rand() < 0.5 ? 0 : 1;
+    }
     const age = set.ageLook !== undefined ? FILL_PHRASES.ageLook[set.ageLook] : AXES.age[Math.floor(rand() * AXES.age.length)];
     const phrases = KEYS.filter((k) => k !== 'ageLook' && k in set).map((k) => FILL_PHRASES[k][set[k]]);
     const variation = `Japanese woman, ${age}, ${phrases.join(', ')}`;
