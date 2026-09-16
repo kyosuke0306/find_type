@@ -36,17 +36,35 @@ export const FEATURES = [
     lowPhrase: '色白の', midPhrase: '肌の明るさがほどよい', highPhrase: '小麦肌の' },
   { key: 'hairColor',   name: '髪の明るさ',   low: '黒髪',       high: '明るい髪',     lowTag: '黒髪',       highTag: '明るい髪',
     lowPhrase: '黒髪の', midPhrase: '髪の明るさがほどよい', highPhrase: '明るい髪の' },
+];
+
+// 髪の長さは「好みを測る対象」ではなく「ペアを選ぶときに揃えるもの」。
+//
+// ロングとベリーショートを並べると「顔がどうであれ短い方は選ばない」人が出て、
+// その回は顔の好みではなく髪の好みしか測れない。実測では、髪を顔より重視する
+// 人の顔の項目の的中率が 45.2% しかなく、結果の 98.7% が「髪を見ていました」に
+// なっていた。
+//
+// かといってペアの選び方だけで髪を揃えると、今度は髪の長さ自体が測れなくなり、
+// 測定項目に残したままでは「測れない項目を1つ抱える」ぶん精度が落ちる
+// （一致率 0.849 → 0.816）。そこで測定項目から外す。
+// 正規化はするので v.hairLength は残り、model.js の W.hair が使う。
+export const PAIR_ONLY_FEATURES = [
   { key: 'hairLength',  name: '髪の長さ',     low: 'ショート',   high: 'ロング',       lowTag: 'ショート',   highTag: 'ロング',
     lowPhrase: 'ショートヘアの', midPhrase: '髪の長さがほどよい', highPhrase: 'ロングヘアの' },
 ];
 
 export const KEYS = FEATURES.map((f) => f.key);
+export const PAIR_ONLY_KEYS = PAIR_ONLY_FEATURES.map((f) => f.key);
+// 正規化する値。測る対象ではないものも、ペアを選ぶために揃えておく。
+export const NORM_KEYS = [...KEYS, ...PAIR_ONLY_KEYS];
 
 // このアプリで知りたいのは顔のパーツの好み。
 // 髪と肌は「顔」ではないので、結果では分けて扱う。
-export const LOOK_KEYS = ['skinTone', 'hairColor', 'hairLength'];
+export const LOOK_KEYS = ['skinTone', 'hairColor'];
 export const FACE_KEYS = KEYS.filter((k) => !LOOK_KEYS.includes(k));
-export const FEATURE_BY_KEY = Object.fromEntries(FEATURES.map((f) => [f.key, f]));
+export const FEATURE_BY_KEY = Object.fromEntries(
+  [...FEATURES, ...PAIR_ONLY_FEATURES].map((f) => [f.key, f]));
 
 // 実測のばらつき。取り込み時に複数解像度で測って中央値を採ったあと、
 // 解像度の組を変えると値がどれだけ動くか（.cache/noise-robust.mjs で実測）。
@@ -129,7 +147,7 @@ export function normalizePool(faces) {
   const n = faces.length;
   if (n === 0) return [];
   const out = faces.map((f) => ({ ...f, v: {} }));
-  for (const key of KEYS) {
+  for (const key of NORM_KEYS) {
     const idx = out.map((_, i) => i).filter((i) => Number.isFinite(out[i].raw?.[key]));
     idx.sort((a, b) => out[a].raw[key] - out[b].raw[key]);
     let i = 0;
