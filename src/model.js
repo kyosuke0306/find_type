@@ -9,6 +9,7 @@
 // 「重視していない特徴」は重視度がほぼ 0 に落ちるので、こだわりの有無を分離できる。
 
 import { KEYS } from './features.js';
+import { SURFACE_BIAS } from './calibration.js';
 
 const sigmoid = (z) => 1 / (1 + Math.exp(-z));
 
@@ -96,8 +97,11 @@ function finish(m, a, keys, comparisons) {
   const model = { m, a, keys };
   // 重視度 = その特徴が 0..1 の範囲で生む好ましさの落差
   const raw = keys.map((_, i) => Math.exp(a[i]) * Math.max(m[i], 1 - m[i]) ** 2);
-  const total = raw.reduce((s, x) => s + x, 0) || 1;
-  model.importance = raw.map((x) => x / total);
+  // 項目ごとに水準が違うぶんをそろえてから並べる（src/calibration.js）。
+  // そろえないと、理想値が端へ寄りやすい項目が重視されていなくても上位に出る。
+  const adj = keys.map((k, i) => raw[i] * (SURFACE_BIAS[k] ?? 1));
+  const total = adj.reduce((s, x) => s + x, 0) || 1;
+  model.importance = adj.map((x) => x / total);
   model.rawImportance = raw;
   // その特徴に差がある比較が何件あったか（推定の裏づけの厚さ）
   model.support = keys.map((k) =>
