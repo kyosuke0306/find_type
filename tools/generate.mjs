@@ -3,6 +3,9 @@
 //
 //   GEMINI_API_KEY=xxx node tools/generate.mjs --count 160 --out .cache/raw
 //
+// キーは環境変数でも、クラウド環境の「API credentials」でも渡せる。
+// 後者はキーがセッションに届かないぶん安全（ヘッダ x-goog-api-key で登録する）。
+//
 // 診断の精度は「プールが特徴空間をどれだけ広くカバーするか」で決まるため、
 // ランダムに生成せず、輪郭・目・眉・髪などの属性グリッドから
 // 均等に組み合わせを引いてプロンプトを作る。
@@ -485,8 +488,16 @@ function buildPrompts(n, opts) {
   return out;
 }
 
+// キーはヘッダで送る。URL に載せるとログや履歴に残るため。
+// キーが無いときはヘッダを付けない。環境の「API credentials」に登録してあれば、
+// セッションの外でエージェントプロキシが付けてくれる（キーはここに届かない）。
+const authHeaders = (key) => ({
+  'content-type': 'application/json',
+  ...(key ? { 'x-goog-api-key': key } : {}),
+});
+
 async function listModels(key) {
-  const r = await fetch(`${API}/models?key=${key}&pageSize=200`);
+  const r = await fetch(`${API}/models?pageSize=200`, { headers: authHeaders(key) });
   const j = await r.json();
   if (!r.ok) throw new Error(JSON.stringify(j));
   for (const m of j.models ?? []) {
@@ -500,7 +511,7 @@ class QuotaZeroError extends Error {}
 /** Gemini image (generateContent) と Imagen (predict) の両方に対応する */
 async function generateOne(key, model, prompt, imageSize) {
   const isImagen = /imagen/i.test(model);
-  const url = isImagen ? `${API}/models/${model}:predict?key=${key}` : `${API}/models/${model}:generateContent?key=${key}`;
+  const url = isImagen ? `${API}/models/${model}:predict` : `${API}/models/${model}:generateContent`;
   // 解像度は料金に直結する（低いほど安い）。このアプリは最終的に縮小するので小さくてよい。
   // ただしモデルごとに受け付ける値が違うため、拒否されたら指定を外して再試行する。
   const imageConfig = { aspectRatio: '1:1', ...(imageSize ? { imageSize } : {}) };
@@ -508,8 +519,16 @@ async function generateOne(key, model, prompt, imageSize) {
     ? { instances: [{ prompt }], parameters: { sampleCount: 1, aspectRatio: '1:1', personGeneration: 'allow_adult' } }
     : { contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['IMAGE'], imageConfig } };
 
-  const res = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(url, { method: 'POST', headers: authHeaders(key), body: JSON.stringify(body) });
   const json = await res.json();
+
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(
+      `認証に失敗しました (HTTP ${res.status})。\n`
+      + '  環境変数 GEMINI_API_KEY を設定するか、クラウド環境の API credentials に\n'
+      + '  generativelanguage.googleapis.com 宛て・ヘッダ x-goog-api-key で登録してください。\n'
+      + `  ${json?.error?.message ?? ''}`);
+  }
 
   if (res.status === 429) {
     const msg = json?.error?.message ?? '';
@@ -546,7 +565,6 @@ async function main() {
   const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 
   if (args.list) {
-    if (!key) { console.error('GEMINI_API_KEY を設定してください'); process.exit(1); }
     return listModels(key);
   }
 
@@ -670,7 +688,13 @@ async function main() {
     console.log(`  スマホ向け  : ${path.relative(process.cwd(), chatPath)}`);
     return;
   }
-  if (!key) { console.error('GEMINI_API_KEY を設定してください（https://aistudio.google.com/apikey）'); process.exit(1); }
+  if (!key) {
+    // 環境の API credentials に登録してある場合はキーが無くても通る。
+    // 通らなければ generateOne が 401/403 で止めて、設定方法を示す。
+    console.log('GEMINI_API_KEY は未設定です。クラウド環境の API credentials を使って続行します。');
+    console.log('  どちらも無い場合はここで認証エラーになります。');
+    console.log();
+  }
 
   const outDir = path.resolve(args.out);
   await fs.mkdir(outDir, { recursive: true });

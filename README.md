@@ -478,6 +478,22 @@ npm run noise-check -- <画像フォルダ>
 
 ### API で顔をまとめて生成する場合
 
+キーの渡し方は2通りあります。どちらでも `tools/generate.mjs` はそのまま動きます。
+
+| | 設定場所 | キーの見え方 |
+|---|---|---|
+| 環境変数 | クラウド環境の **Environment variables** に `GEMINI_API_KEY=...` | セッション内から読める |
+| API credential | クラウド環境の **API credentials**（Pro / Max のみ） | セッションには届かない。プロキシが付ける |
+
+後者のほうが安全です。登録はこうします。
+
+- **Allowed websites**: `generativelanguage.googleapis.com`
+- **Custom headers**: 名前 `x-goog-api-key` / Prefix は空 / 値にキー
+
+どちらも、設定できる場所は claude.ai/code の**メッセージ欄の上にある雲のアイコン**（いまの環境名が出ているボタン）です。設定ページや直リンクはありません。環境の行の歯車を開くと、Environment variables と API credentials が並んでいます。
+**変更は次に始めるセッションから効きます**（実行中のセッションは起動時の値を持ち続けます）。
+
+
 ```bash
 GEMINI_API_KEY=xxxx npm run generate -- --count 160 --out .cache/raw
 npm run analyze -- --from .cache/raw
