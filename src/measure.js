@@ -100,15 +100,39 @@ export function samplePatch(px, W, H, cx, cy, r, stride = 3) {
  * 広いほど頭と肩がよく入るが、画像に収まらなければ意味がないので、
  * 収まる範囲でできるだけ広い枠を選ぶ。単位は両目間距離 d。
  */
+// 枠の広さの上限と下限。単位は両目間距離 d。
+//
+// 枠が広いほど顔は小さく写る。1枚だけ顔が小さいと、その顔は中身ではなく
+// 「小さいから」選ばれにくくなり、集めた選択がゆがむ。そろえる必要がある。
+//
+// 同梱115枚の実測では 113枚が 4.70〜5.13倍 に収まっていた。
+// 外れたのは2枚で、どちらも頭頂の実測が髪のほつれや背景のムラを拾って
+// 上に外し、その分だけ枠が広がっていた（6.36倍 と 5.35倍）。
+// 頭頂の判定を厳しくするより、枠の広さを抑えるほうが確実で副作用がない。
+const BOX_MAX = 5.2;
+const BOX_MIN = 4.0;
+
 export function chooseBox(geo, W, H, headTop = null) {
   const d = geo._d;
   // 頭頂が実測できていればそこを基準にする。できなければ両目の間隔から見積もる。
-  const top = Math.round((headTop ?? (geo._eyeMid.y - 1.75 * d)) - d * 0.16);
+  const top0 = (headTop ?? (geo._eyeMid.y - 1.75 * d)) - d * 0.16;
   // あごの下も入れておく（髪の長さは別に元画像で測るが、見た目として肩まで欲しい）
-  const need = (geo._chin.y + d * 0.95) - top;
-  const box = Math.round(Math.min(d * 6.6, Math.max(need, d * 4.0)));
-  const ox = Math.round(geo._eyeMid.x - box / 2);
-  const oy = top;
+  const need = (geo._chin.y + d * 0.95) - top0;
+  // 元画像からはみ出す枠は、足りないぶんを作った画素で埋めることになる。
+  // 作った画素は 完全な無地の帯として見えるので、埋める前に枠を縮める。
+  // 縮めても下限を割るときだけ、最後の手段として埋める。
+  const fits = Math.min(W, H);
+  let box = Math.round(Math.min(d * BOX_MAX, Math.max(need, d * BOX_MIN)));
+  box = Math.round(Math.max(Math.min(box, fits), Math.min(d * BOX_MIN, fits)));
+
+  // 上限で切り詰めたぶんは上下に振り分ける。頭頂に合わせたままだと、
+  // 頭の上だけ詰まってあごの下が余る。
+  let oy = Math.round(top0 + Math.max(0, need - box) * 0.5);
+  let ox = Math.round(geo._eyeMid.x - box / 2);
+  // はみ出すなら、埋めずにまず画像の中へ寄せる
+  if (box <= W) ox = Math.min(Math.max(ox, 0), W - box);
+  if (box <= H) oy = Math.min(Math.max(oy, 0), H - box);
+
   const pad = Math.max(-ox, -oy, ox + box - W, oy + box - H, 0);
   return { box, ox, oy, pad };
 }

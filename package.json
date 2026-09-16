@@ -16,7 +16,8 @@
     "pick": "node tools/pick.mjs",
     "feature-report": "node tools/feature-report.mjs",
     "balance": "node tools/balance.mjs",
-    "gap-check": "node tools/gap-check.mjs"
+    "gap-check": "node tools/gap-check.mjs",
+    "calibrate": "node tools/calibrate.mjs"
   },
   "devDependencies": {
     "@tensorflow/tfjs": "4.22.0",
