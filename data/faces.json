@@ -1,6 +1,6 @@
 {
  "generatedAt": "2026-09-16T04:29:23.987Z",
- "count": 115,
+ "count": 114,
  "faces": [
   {
    "id": "f01",
@@ -972,33 +972,6 @@
     "hairColor": 34.89302,
     "hairLength": 0.87535,
     "ageLook": 15.33618
-   }
-  },
-  {
-   "id": "f79",
-   "file": "f79.jpg",
-   "tier": "cute",
-   "gender": "female",
-   "genderProbability": 1,
-   "detectedGender": "female",
-   "age": 14.3,
-   "detScore": 0.997,
-   "raw": {
-    "faceLength": 0.76126,
-    "jawSharp": -0.65612,
-    "eyeSize": 0.12603,
-    "eyeTilt": 0.03592,
-    "eyeDistance": 0.26843,
-    "browEyeGap": 0.30021,
-    "browAngle": -0.00668,
-    "browArch": 0.09186,
-    "noseWidth": 0.34392,
-    "mouthWidth": 0.73716,
-    "lipThick": 0.20953,
-    "skinTone": -103.72824,
-    "hairColor": 42.14309,
-    "hairLength": 0.25528,
-    "ageLook": 13.60794
    }
   },
   {
