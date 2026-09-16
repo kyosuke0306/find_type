@@ -274,7 +274,12 @@ function buildDecorrelatePrompts(faces, n, opts) {
       index: i, gender: 'woman',
       why: `${jaName(t.a)}(${jaSide(t.a, t.ai)}) × ${jaName(t.b)}(${jaSide(t.b, t.bi)})  いま${t.have}枚 / r=${t.r.toFixed(2)}`,
       variation,
-      text: `A ${FRAMING}. A ${vibe} ${variation}, still a strikingly pretty and cute face.`,
+      // かわいさを押すと、生成器は「かわいい顔の正解値」から離れられず、
+      // 狙った象限の片側（小鼻がしっかり×小さめの口、など）が作れない。
+      // --vibe neutral のときは押さえの一文ごと外して、実測値の側を優先する。
+      text: vibe
+        ? `A ${FRAMING}. A ${vibe} ${variation}, still a strikingly pretty and cute face.`
+        : `A ${FRAMING}. A ${variation}.`,
     });
   }
   return out;
