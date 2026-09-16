@@ -98,11 +98,11 @@ function buildStartScreen() {
 
   // 精度は同梱プールでの実測値（node test/simulate.mjs <問数> 120 --pool data/faces.json）
   $('rounds-choices').innerHTML = [
-    // 115枚・較正後の実測（node test/simulate.mjs <問数> 200 --pool data/faces.json の
+    // 114枚・較正後の実測（node test/simulate.mjs <問数> 200 --pool data/faces.json の
     // adaptive 予測一致率）。顔を足したり較正を変えたら測り直す。
     { v: 20, label: 'さくっと', acc: 81 },
-    { v: 30, label: 'おすすめ', acc: 84 },
-    { v: 45, label: 'しっかり', acc: 87 },
+    { v: 30, label: 'おすすめ', acc: 85 },
+    { v: 45, label: 'しっかり', acc: 88 },
     { v: 90, label: 'とことん', acc: 90 },
   ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
       <span class="big">${r.v}</span><span class="sub">${r.label}</span>

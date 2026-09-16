@@ -112,6 +112,13 @@ export function samplePatch(px, W, H, cx, cy, r, stride = 3) {
 const BOX_MAX = 5.2;
 const BOX_MIN = 4.0;
 
+// あごを枠のどこに置くか（上からの割合）。
+// 縦の位置は頭頂ではなく、あご（ランドマークで確実に取れる）を基準にする。
+// 頭頂は髪のほつれや背景のムラを拾って上に外すことがあり、そこを起点にすると
+// 誤差がそのまま顔の位置のずれになる。同梱115枚の実測の中央値が 80.3% で、
+// 従来の枠の取り方（あごの下に 0.95d 残す）とも一致するので、ここを狙う。
+const CHIN_AT = 0.803;
+
 export function chooseBox(geo, W, H, headTop = null) {
   const d = geo._d;
   // 頭頂が実測できていればそこを基準にする。できなければ両目の間隔から見積もる。
@@ -125,9 +132,8 @@ export function chooseBox(geo, W, H, headTop = null) {
   let box = Math.round(Math.min(d * BOX_MAX, Math.max(need, d * BOX_MIN)));
   box = Math.round(Math.max(Math.min(box, fits), Math.min(d * BOX_MIN, fits)));
 
-  // 上限で切り詰めたぶんは上下に振り分ける。頭頂に合わせたままだと、
-  // 頭の上だけ詰まってあごの下が余る。
-  let oy = Math.round(top0 + Math.max(0, need - box) * 0.5);
+  // 縦はあごを基準に置く。頭頂の実測が外れていても、顔の位置はずれない。
+  let oy = Math.round(geo._chin.y - box * CHIN_AT);
   let ox = Math.round(geo._eyeMid.x - box / 2);
   // はみ出すなら、埋めずにまず画像の中へ寄せる
   if (box <= W) ox = Math.min(Math.max(ox, 0), W - box);
