@@ -88,12 +88,18 @@
     <p class="result-formula" id="result-formula"></p>
     <div class="result-tags" id="result-tags"></div>
 
-    <div class="card reveal" style="--i:0">
+    <!-- 楽しさが先、分析は後。いちばんの見どころは「好みに近い顔」なので大きく出す。 -->
+    <div class="card reveal card-hero" style="--i:0">
       <h2 class="card-title" id="t-top"></h2>
       <div class="top-faces" id="top-faces"></div>
     </div>
 
     <div class="card reveal" style="--i:1">
+      <h2 class="card-title" id="t-chosen"></h2>
+      <div class="chosen-strip" id="chosen-strip"></div>
+    </div>
+
+    <div class="card reveal" style="--i:2">
       <h2 class="card-title" id="t-style"></h2>
       <p class="style-verdict" id="style-verdict">—</p>
       <div class="style-scale">
@@ -104,15 +110,14 @@
       <p class="card-note" id="style-note"></p>
     </div>
 
-    <div class="card reveal" style="--i:2">
-      <h2 class="card-title" id="t-where"></h2>
-      <ul class="facemap-list" id="facemap-list"></ul>
-    </div>
-
+    <!-- 部位ごとのまとめと、その内訳を1枚にまとめる。
+         別々のカードにすると、同じ重視度を違う分母で2回見せることになる。 -->
     <div class="card reveal" style="--i:3">
       <h2 class="card-title" id="t-feat"></h2>
+      <ul class="facemap-list" id="facemap-list"></ul>
+      <p class="feat-lead" id="feat-lead"></p>
       <div id="feature-list"></div>
-      <button id="btn-show-rest" class="btn btn-ghost btn-block">もっと見る</button>
+      <button id="btn-show-rest" class="btn btn-ghost btn-block">くわしく見る</button>
     </div>
 
     <div class="card reveal" style="--i:4">
@@ -133,11 +138,6 @@
         <p class="consistency-label" id="consistency-label">—</p>
         <p class="card-note">選択のブレの少なさ</p>
       </div>
-    </div>
-
-    <div class="card reveal" style="--i:6">
-      <h2 class="card-title" id="t-chosen"></h2>
-      <div class="chosen-strip" id="chosen-strip"></div>
     </div>
 
     <div class="actions">

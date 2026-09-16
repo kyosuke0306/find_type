@@ -325,15 +325,29 @@ async function finishSession() {
 /** 結果で言い切ってよい項目か（古い保存結果には情報がないので全部通す） */
 const usableOf = (r) => (r.usable ? new Set(r.usable) : new Set(KEYS));
 
+/**
+ * 顔の項目だけを分母にした重視度の割合。
+ *
+ * 画面のどこでもこれを使う。以前はタグが15項目すべて、内訳が顔の12項目、
+ * 部位のまとめがまた別、と分母が3通りあり、同じ項目が 37% と 46% の
+ * 2通りで出ていた。分母をそろえると、部位の % は内訳の % の合計になる。
+ */
+function faceShares(r) {
+  const can = usableOf(r);
+  const total = FACE_KEYS.reduce((s, k) => s + (can.has(k) ? r.importance[KEYS.indexOf(k)] : 0), 0) || 1;
+  return (i) => (can.has(KEYS[i]) ? r.importance[i] / total : 0);
+}
+
 /** 効いていた顔のパーツを、重視度の高い順に返す（見出しと式で共用） */
 function topTags(r, limit) {
   const usable = usableOf(r);
+  const share = faceShares(r);
   const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]);
   const tags = [];
   for (const i of order) {
     if (tags.length >= limit) break;
     if (!usable.has(KEYS[i]) || !FACE_KEYS.includes(KEYS[i])) continue;
-    if (r.importance[i] < 0.085 || (r.support?.[i] ?? 0) < 3) continue;
+    if (share(i) < 0.12 || (r.support?.[i] ?? 0) < 3) continue;
     const f = FEATURES[i], m = r.m[i];
     tags.push(m > 0.62 ? f.highTag : m < 0.38 ? f.lowTag : `中間の${f.name}`);
   }
@@ -370,17 +384,17 @@ function renderResult(r) {
   // 上位項目をタグで見せる（説明文の代わり）。
   // 重視度がほぼ0の項目を並べても意味がないので、目立つものだけ出す。
   const usable = usableOf(r);
+  const share = faceShares(r);
   const isFace = (i) => usable.has(KEYS[i]) && FACE_KEYS.includes(KEYS[i]);
-  const shown = order.filter((i) => isFace(i) && r.importance[i] >= 0.05).slice(0, 3);
+  const shown = order.filter((i) => isFace(i) && share(i) >= 0.08).slice(0, 3);
   const fallback = order.filter(isFace).slice(0, 1);
   $('result-tags').innerHTML = (shown.length ? shown : fallback).map((i, n) =>
     `<span class="tag" style="--i:${n}">${featureIcon(KEYS[i])}${FEATURES[i].name}
-       <b>${Math.round(r.importance[i] * 100)}%</b></span>`).join('');
+       <b>${Math.round(share(i) * 100)}%</b></span>`).join('');
 
   $('t-top').innerHTML = `${icon('crown')}好みに近い顔`;
   $('t-style').innerHTML = `${icon('sparkle')}きれい系 or かわいい系`;
-  $('t-where').innerHTML = `${featureIcon('eyeSize')}どこを見て決めているか`;
-  $('t-feat').innerHTML = `${icon('chart')}効いていた顔のパーツ`;
+  $('t-feat').innerHTML = `${icon('chart')}好みの決め手`;
   $('t-look').innerHTML = `${featureIcon('hairLength')}髪と肌`;
   $('t-chosen').innerHTML = `${icon('heart', { cls: 'is-heart' })}選んだ顔 <span class="card-note">${r.chosen.length}枚</span>`;
 
@@ -463,10 +477,7 @@ function renderFaceMap(r) {
 
 function renderFeatures(r) {
   const can = usableOf(r);
-  // 顔のパーツの中での割合に直す。髪と肌を混ぜると、顔の項目がどれも
-  // 数%に見えて読み取れなくなるため。
-  const faceTotal = FACE_KEYS.reduce((s, k) => s + (can.has(k) ? r.importance[KEYS.indexOf(k)] : 0), 0) || 1;
-  const share = (i) => r.importance[i] / faceTotal;
+  const share = faceShares(r);
 
   const order = FACE_KEYS.map((k) => KEYS.indexOf(k)).sort((a, b) => {
     const ua = can.has(KEYS[a]) ? 1 : 0, ub = can.has(KEYS[b]) ? 1 : 0;
@@ -474,7 +485,13 @@ function renderFeatures(r) {
     return r.importance[b] - r.importance[a];
   });
   const max = Math.max(...order.map((i) => (can.has(KEYS[i]) ? share(i) : 0)), 1e-6);
-  const nStrong = Math.max(6, order.filter((i) => can.has(KEYS[i]) && share(i) >= 0.05).length);
+  // 5% と 4% の差は読み取れない（測定でも確からしさは 6〜8割）。
+  // 意味のある差がある上位だけ出し、残りは「くわしく見る」に送る。
+  const strong = order.filter((i) => can.has(KEYS[i]) && share(i) >= 0.10);
+  const nStrong = Math.min(Math.max(strong.length, 2), 3);
+  $('feat-lead').textContent = nStrong
+    ? `${FEATURES[order[0]].name}がいちばんの決め手でした`
+    : '';
 
   const row = (i, n) => {
     const f = FEATURES[i], m = r.m[i], v = share(i);
@@ -519,9 +536,13 @@ function renderFeatures(r) {
 
 /** 髪と肌。顔のパーツとは別扱いにする */
 function renderLook(r, can) {
+  // 顔の項目と髪・肌は別の群として、それぞれの中での割合で出す。
+  // 混ぜた分母で並べると、顔の 35% と髪の 7% が比べられるように見えて誤解を生む。
+  // 群どうしの大きさは、下の一文（全体の何%が髪と肌か）が受け持つ。
   const all = r.importance.reduce((s, x) => s + x, 0) || 1;
-  const lookTotal = LOOK_KEYS.reduce((s, k) => s + r.importance[KEYS.indexOf(k)], 0);
+  const lookTotal = LOOK_KEYS.reduce((s, k) => s + (can.has(k) ? r.importance[KEYS.indexOf(k)] : 0), 0);
   const pct = Math.round((lookTotal / all) * 100);
+  const lookShare = (i) => (can.has(KEYS[i]) ? r.importance[i] / (lookTotal || 1) : 0);
   $('look-note').textContent = pct >= 50
     ? `顔のパーツより、髪と肌のほうを見て選んでいます（全体の ${pct}%）`
     : `選ぶときの ${pct}% は髪と肌で決まっていました`;
@@ -541,7 +562,7 @@ function renderLook(r, can) {
         <div class="feat-head">
           ${featureIcon(f.key)}
           <span class="feat-name">${f.name}</span>
-          <span class="feat-pct">${Math.round((imp / all) * 100)}%</span>
+          <span class="feat-pct">${Math.round(lookShare(i) * 100)}%</span>
         </div>
         <div class="feat-bar"><div class="feat-fill" data-w="${(imp / lookMax) * 100}%"></div></div>
         <div class="axis">
@@ -579,7 +600,7 @@ async function copyResult(r) {
     `内訳 → ${typeFormula(r)}`,
     `系統 → ${style}`,
     `よく見ている → ${parts.map((p) => `${p.name} ${Math.round(p.share * 100)}%`).join(' / ')}`,
-    order.map((i) => `${FEATURES[i].name} ${Math.round(r.importance[i] * 100)}%`).join(' / '),
+    order.map((i) => `${FEATURES[i].name} ${Math.round(faceShares(r)(i) * 100)}%`).join(' / '),
     `髪と肌 ${lookPct}%`,
     `一貫性 ${Math.round((r.loo ?? r.trainAccuracy) * 100)}%（${r.rounds}回）`,
   ].join('\n');

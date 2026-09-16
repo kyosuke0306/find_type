@@ -290,9 +290,24 @@ code {
 }
 .reveal { animation: screenIn .5s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(.08s * var(--i)); }
 
+/* いちばんの見どころなので、1位を大きく、2・3位を横に添える */
+.card-hero .top-faces {
+  display: grid; gap: 10px;
+  grid-template-columns: 2fr 1fr;
+  grid-template-areas: 'a b' 'a c';
+}
+.card-hero .top-faces figure:nth-child(1) { grid-area: a; }
+.card-hero .top-faces figure:nth-child(2) { grid-area: b; }
+.card-hero .top-faces figure:nth-child(3) { grid-area: c; }
 .top-faces { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .top-faces figure { margin: 0; position: relative; }
 .top-faces img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 14px; display: block; }
+
+/* 部位のまとめと内訳のあいだの一言 */
+.feat-lead {
+  margin: 14px 0 2px; padding-top: 14px; border-top: 1px solid var(--line);
+  font-size: .86rem; font-weight: 600; color: var(--ink);
+}
 .rank {
   position: absolute; top: -6px; left: -6px; width: 26px; height: 26px; border-radius: 50%;
   background: var(--accent); color: #fff; font-size: .78rem; font-weight: 700;
