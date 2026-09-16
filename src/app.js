@@ -319,7 +319,135 @@ async function finishSession() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(payload)); } catch { /* 容量超過は無視 */ }
   $('arena').classList.remove('is-loading');
   renderResult(payload);
-  show('screen-result');
+  startStory(payload);
+}
+
+/* ===== 結果を1枚ずつめくって見せる ===== */
+
+/**
+ * スライドの内容を組み立てる。
+ *
+ * 数字をいきなり全部出すより、1つずつ開けていくほうが見ていて楽しい。
+ * いちばんの見どころ（好みに近い顔）は最後に取っておく。
+ */
+function buildSlides(r) {
+  const can = usableOf(r);
+  const share = faceShares(r);
+  const order = KEYS.map((_, i) => i).sort((a, b) => r.importance[b] - r.importance[a]);
+  const faceOrder = order.filter((i) => can.has(KEYS[i]) && FACE_KEYS.includes(KEYS[i]));
+  const parts = partShares(r.importance, can);
+  const { score, basis } = cuteScore(r.m, r.importance, can);
+  const vague = basis < 0.35 || Math.abs(score) < 0.12;
+  const pct = Math.round((r.loo ?? r.trainAccuracy) * 100);
+  const srcOf = (id) => state.byId.get(id)?.src ?? '';
+  const top1 = faceOrder[0];
+  const f1 = top1 !== undefined ? FEATURES[top1] : null;
+  const side1 = f1 ? (r.m[top1] > 0.62 ? f1.highTag : r.m[top1] < 0.38 ? f1.lowTag : `中間の${f1.name}`) : null;
+
+  const slides = [];
+
+  slides.push({
+    cls: 'st-open',
+    html: `<p class="st-kicker">${r.rounds}回の選択を読みました</p>
+      <h2 class="st-big">結果が<br>出ました</h2>
+      <p class="st-sub">あなたが何を見ていたのか、順番に見ていきます</p>`,
+  });
+
+  if (parts.length) {
+    slides.push({
+      cls: 'st-parts',
+      html: `<p class="st-kicker">まず、顔のどこを見ていたか</p>
+        <h2 class="st-lead">いちばん見ていたのは<br><b>${parts[0].name}</b>でした</h2>
+        <ul class="st-bars">${parts.slice(0, 4).map((p, n) => `
+          <li style="--i:${n}"><span>${p.name}</span>
+            <i class="st-bar"><b data-w="${(p.share / parts[0].share) * 100}%"></b></i>
+            <em>${Math.round(p.share * 100)}%</em></li>`).join('')}</ul>`,
+    });
+  }
+
+  if (f1) {
+    slides.push({
+      cls: 'st-feat',
+      html: `<p class="st-kicker">もっとこまかく見ると</p>
+        <h2 class="st-lead"><b>${f1.name}</b>が<br>${Math.round(share(top1) * 100)}%を占めていました</h2>
+        <div class="st-axis">
+          <span>${f1.lowTag}</span>
+          <i class="st-track"><b data-left="${r.m[top1] * 100}%"></b></i>
+          <span>${f1.highTag}</span>
+        </div>
+        <p class="st-sub">あなたが好きなのは<b>${side1}</b>です</p>`,
+    });
+  }
+
+  slides.push({
+    cls: 'st-style',
+    html: `<p class="st-kicker">では、どんな系統か</p>
+      <h2 class="st-lead">${vague ? 'きれい系もかわいい系も<br><b>同じくらい</b>'
+        : `あなたは<br><b class="${score > 0 ? 'is-cute' : ''}">${score > 0 ? 'かわいい系' : 'きれい系'}</b>${Math.abs(score) >= 0.45 ? '、はっきりと。' : '寄りです'}`}</h2>
+      <div class="st-scale"><span>きれい系</span>
+        <i class="st-track"><b data-left="${((score + 1) / 2) * 100}%" class="${vague ? '' : score > 0 ? 'is-cute' : ''}"></b></i>
+        <span>かわいい系</span></div>`,
+  });
+
+  slides.push({
+    cls: 'st-consist',
+    html: `<p class="st-kicker">選び方のブレは</p>
+      <h2 class="st-big"><span class="st-num" data-num="${pct}">0%</span></h2>
+      <p class="st-lead">${pct >= 85 ? '好みが<b>はっきり</b>しています'
+        : pct >= 72 ? '好みは<b>一貫</b>しています'
+        : pct >= 60 ? '<b>ややブレ</b>がありました'
+        : '<b>気分で選んで</b>いたようです'}</p>`,
+  });
+
+  const tops = r.top.filter((id) => srcOf(id));
+  if (tops.length) {
+    slides.push({
+      cls: 'st-faces',
+      html: `<p class="st-kicker">お待たせしました</p>
+        <h2 class="st-lead">あなたの好みに<br>いちばん近い顔は</h2>
+        <div class="st-face-wrap"><img src="${srcOf(tops[0])}" alt="好みに近い顔 1位"></div>
+        <p class="st-sub">${typePhrase(r)}</p>`,
+    });
+  }
+
+  slides.push({
+    cls: 'st-end',
+    html: `<h2 class="st-big">${typePhrase(r)}</h2>
+      <p class="st-sub">タップして、ぜんぶの結果を見る</p>`,
+  });
+
+  return slides;
+}
+
+/** スライドを開始する */
+function startStory(r) {
+  const slides = buildSlides(r);
+  let at = -1;
+  const stage = $('story-stage');
+  $('story-progress').innerHTML = slides.map(() => '<i></i>').join('');
+  const dots = [...$('story-progress').children];
+
+  const next = () => {
+    at++;
+    if (at >= slides.length) { show('screen-result'); return; }
+    dots.forEach((d, i) => d.classList.toggle('is-on', i <= at));
+    const s = slides[at];
+    stage.innerHTML = `<div class="st-slide ${s.cls}">${s.html}</div>`;
+    $('story-hint').textContent = at === slides.length - 1 ? 'タップでまとめへ' : 'タップで次へ';
+    // 描画してから動かす
+    requestAnimationFrame(() => {
+      stage.querySelectorAll('.st-bar b').forEach((el) => { el.style.width = el.dataset.w; });
+      stage.querySelectorAll('.st-track b').forEach((el) => { el.style.left = el.dataset.left; });
+      const num = stage.querySelector('.st-num');
+      if (num) countUp(num, Number(num.dataset.num), 900);
+    });
+  };
+
+  const onTap = (e) => { if (e.target.closest('#story-skip')) return; next(); };
+  $('screen-story').onclick = onTap;
+  $('story-skip').onclick = () => show('screen-result');
+  next();
+  show('screen-story');
 }
 
 /** 結果で言い切ってよい項目か（古い保存結果には情報がないので全部通す） */
@@ -457,7 +585,7 @@ function renderStyle(r) {
   $('style-verdict').classList.toggle('is-cute', !vague && cute);
   $('style-note').textContent = vague
     ? '系統で選ぶより、個々のパーツを見ているようです'
-    : `${top.slice(0, 2).map((i) => FEATURES[i].name).join('と')}が決め手です`;
+    : `${top.slice(0, 2).map((i) => FEATURES[i].name).join('と')}にあらわれています`;
   const marker = $('style-marker');
   marker.dataset.left = `${((score + 1) / 2) * 100}%`;
   marker.classList.toggle('is-vague', vague);
