@@ -394,7 +394,7 @@ function renderResult(r) {
 
   $('t-top').innerHTML = `${icon('crown')}好みに近い顔`;
   $('t-style').innerHTML = `${icon('sparkle')}きれい系 or かわいい系`;
-  $('t-feat').innerHTML = `${icon('chart')}好みの決め手`;
+  $('t-feat').innerHTML = `${icon('chart')}見ていたところ`;
   $('t-look').innerHTML = `${featureIcon('hairLength')}髪と肌`;
   $('t-chosen').innerHTML = `${icon('heart', { cls: 'is-heart' })}選んだ顔 <span class="card-note">${r.chosen.length}枚</span>`;
 
@@ -490,7 +490,7 @@ function renderFeatures(r) {
   const strong = order.filter((i) => can.has(KEYS[i]) && share(i) >= 0.10);
   const nStrong = Math.min(Math.max(strong.length, 2), 3);
   $('feat-lead').textContent = nStrong
-    ? `${FEATURES[order[0]].name}がいちばんの決め手でした`
+    ? `とくに${FEATURES[order[0]].name}を見ていました`
     : '';
 
   const row = (i, n) => {
