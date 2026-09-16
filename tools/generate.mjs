@@ -423,7 +423,7 @@ function buildFillPrompts(targets, n, opts) {
 }
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, spread: false, plain: false, decorrelate: null, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, spread: false, plain: false, decorrelate: null, budgetJpy: null, usdPerImage: 0.045, jpyPerUsd: 160, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
@@ -439,6 +439,9 @@ function parseArgs(argv) {
     else if (k === '--female-ratio') a.femaleRatio = Number(argv[++i]);
     else if (k === '--concurrency') a.concurrency = Number(argv[++i]);
     else if (k === '--seed') a.seed = Number(argv[++i]);
+    else if (k === '--budget-jpy') a.budgetJpy = Number(argv[++i]);
+    else if (k === '--usd-per-image') a.usdPerImage = Number(argv[++i]);
+    else if (k === '--jpy-per-usd') a.jpyPerUsd = Number(argv[++i]);
     else if (k === '--dry-run') a.dryRun = true;
     else if (k === '--list-models') a.list = true;
   }
@@ -696,6 +699,26 @@ async function main() {
     console.log();
   }
 
+  // 予算の上限。枚数に直してから切り詰めるので、実行中に超えることはない。
+  // 為替と単価は多めに見積もる（多めに見るほど枚数が減り、超えにくくなる）。
+  let budgetNote = '';
+  if (Number.isFinite(args.budgetJpy) && args.budgetJpy > 0) {
+    const perImage = args.usdPerImage * args.jpyPerUsd;
+    const maxImages = Math.floor(args.budgetJpy / perImage);
+    if (maxImages < 1) {
+      console.error(`予算 ${args.budgetJpy}円では1枚も作れません（1枚あたり約${perImage.toFixed(1)}円）。`);
+      process.exit(1);
+    }
+    budgetNote = `予算 ${args.budgetJpy}円 / 1枚あたり約${perImage.toFixed(1)}円 → 最大 ${maxImages}枚`;
+    if (prompts.length > maxImages) {
+      console.log(`${budgetNote}。${prompts.length}件のうち先頭 ${maxImages}件だけ生成します。`);
+      prompts = prompts.slice(0, maxImages);
+    } else {
+      console.log(`${budgetNote}。${prompts.length}件は予算内です（見込み 約${Math.ceil(prompts.length * perImage)}円）。`);
+    }
+    console.log();
+  }
+
   const outDir = path.resolve(args.out);
   await fs.mkdir(outDir, { recursive: true });
   const meta = [];
@@ -735,6 +758,11 @@ async function main() {
   await Promise.all(workers);
 
   if (meta.length) await fs.writeFile(path.join(outDir, 'prompts.json'), JSON.stringify(meta, null, 1));
+  if (budgetNote) {
+    const spent = done * args.usdPerImage * args.jpyPerUsd;
+    console.log(`\n${budgetNote}  実際に作った ${done}枚 → 概算 ${Math.ceil(spent)}円`);
+    console.log('  ※ 概算です。正確な請求額は Google の請求画面を見てください。');
+  }
   if (fatal) {
     console.error(`\n中断しました。\n${fatal.message}`);
     console.error(`\n利用できるモデルの確認: node tools/generate.mjs --list-models`);

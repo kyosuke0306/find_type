@@ -499,6 +499,14 @@ GEMINI_API_KEY=xxxx npm run generate -- --count 160 --out .cache/raw
 npm run analyze -- --from .cache/raw
 ```
 
+使う額に上限をつけるときは `--budget-jpy` を付けます。予算を枚数に直してから
+プロンプトを切り詰めるので、**実行中に上限を超えることはありません**。
+
+```bash
+npm run generate -- --decorrelate --count 60 --budget-jpy 500 --out .cache/decor
+# → 予算 500円 / 1枚あたり約7.2円 → 最大 69枚。60件は予算内です（見込み 約432円）
+```
+
 > **Gemini の画像生成には課金の有効化が必要です。**
 > 画像生成モデルには無料枠が存在せず（料金表の無料枠欄が「利用不可」）、
 > 無料枠のプロジェクトからは `limit: 0` のエラーになって1枚も生成できません。
@@ -509,6 +517,9 @@ npm run analyze -- --from .cache/raw
 | `--count` | 160 | 生成枚数 |
 | `--model` | `gemini-3.1-flash-image` | `--list-models` で利用可能なモデルを確認できます |
 | `--image-size` | `0.5K` | 出力解像度。単価に直結します（0.5K なら1枚 $0.045 程度） |
+| `--budget-jpy` | – | 使う上限（円）。枚数に直して切り詰めるので、実行中に超えません |
+| `--usd-per-image` | `0.045` | 1枚あたりの単価。予算計算に使う |
+| `--jpy-per-usd` | `160` | 為替。多めに見積もるほど枚数が減り、超えにくくなる |
 | `--ethnicity` | `japanese` | `japanese` / `eastasian` / `mixed` / `global` |
 | `--vibe` | `idol` | `idol`（アイドル・女優くらいのかわいさ／化粧あり）/ `student`（かわいい女子大学生）/ `cute`（かわいい雰囲気）/ `neutral`（指定なし） |
 
