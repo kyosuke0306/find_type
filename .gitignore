@@ -4,3 +4,6 @@ node_modules/
 
 # 手元だけで使う顔プール（リポジトリに入れない）
 private/
+
+# npm install が作るロックファイル（このリポジトリでは管理しない）
+package-lock.json
