@@ -350,7 +350,7 @@ function buildSlides(r) {
     cls: 'st-open',
     html: `<p class="st-kicker">${r.rounds}回の選択を読みました</p>
       <h2 class="st-big">結果が<br>出ました</h2>
-      <p class="st-sub">あなたが何を見ていたのか、順番に見ていきます</p>`,
+      <p class="st-sub">何を見ていたのか、順番に見ていきます</p>`,
   });
 
   if (parts.length) {
@@ -369,7 +369,7 @@ function buildSlides(r) {
     slides.push({
       cls: 'st-feat',
       html: `<p class="st-kicker">もっとこまかく見ると</p>
-        <h2 class="st-lead"><b>${f1.name}</b>が<br>${Math.round(share(top1) * 100)}%を占めていました</h2>
+        <h2 class="st-lead"><b>${f1.name}</b>が<br>${Math.round(share(top1) * 100)}%を<br>占めていました</h2>
         <div class="st-axis">
           <span>${f1.lowTag}</span>
           <i class="st-track"><b data-left="${r.m[top1] * 100}%"></b></i>
@@ -379,14 +379,19 @@ function buildSlides(r) {
     });
   }
 
+  // 見出しは判定だけにする。強さを同じ行に足すと、狭い画面で
+  // 最後の1〜2文字だけ次の行に落ちて間が抜ける。
+  const styleWord = score > 0 ? 'かわいい系' : 'きれい系';
   slides.push({
     cls: 'st-style',
     html: `<p class="st-kicker">では、どんな系統か</p>
-      <h2 class="st-lead">${vague ? 'きれい系もかわいい系も<br><b>同じくらい</b>'
-        : `あなたは<br><b class="${score > 0 ? 'is-cute' : ''}">${score > 0 ? 'かわいい系' : 'きれい系'}</b>${Math.abs(score) >= 0.45 ? '、はっきりと。' : '寄りです'}`}</h2>
+      <h2 class="st-lead">${vague ? 'きれい系も<br>かわいい系も<br><b>同じくらい</b>'
+        : `あなたは<br><b class="${score > 0 ? 'is-cute' : ''}">${styleWord}</b>`}</h2>
       <div class="st-scale"><span>きれい系</span>
         <i class="st-track"><b data-left="${((score + 1) / 2) * 100}%" class="${vague ? '' : score > 0 ? 'is-cute' : ''}"></b></i>
-        <span>かわいい系</span></div>`,
+        <span>かわいい系</span></div>
+      <p class="st-sub">${vague ? '系統より、個々のパーツを見ているようです'
+        : Math.abs(score) >= 0.45 ? 'はっきりと出ています' : 'どちらかといえば、です'}</p>`,
   });
 
   slides.push({
