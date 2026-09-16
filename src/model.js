@@ -154,11 +154,33 @@ export function looAccuracy(comparisons, keys = KEYS, opts = {}) {
  * しかも顔のパーツとかわいさには相関があるため（あごのラインなど）、
  * 混ぜたまま出すと全員が同じ結果に寄っていく。
  * 同じ層どうしに限れば、かわいさの差が打ち消し合ってパーツの好みだけが残る。
+ *
+ * 髪の長さでも同じことが起きるので、かわいい層はさらに髪の長さで分ける。
+ * ロングとベリーショートを並べると「顔がどうであれ短い方は選ばない」人が出て、
+ * その回は顔ではなく髪の好みしか測れない。実測では、髪を顔より重視する人の
+ * 顔の項目の的中率が 46.8% → 60.7% に上がり、髪を気にしない人には影響がない
+ * （67.3% → 67.6%）。髪の長さが近い顔どうしなら、髪の差が打ち消し合う。
  */
 // test/simulate.mjs で調整した重み
 export const PAIR_WEIGHTS = { gain: 2, spread: 0, unc: 1, fatigue: 0.6 };
 
-export const tierOf = (f) => f.tier ?? 'cute';
+// 髪の長さの帯の数。v は順位で正規化されているので、等分＝四分位になる。
+// 分位点なので、顔を足しても閾値を引き直さなくてよい。
+// 3等分では足りず（55.8%）、4等分で頭打ちになった。
+const HAIR_BANDS = 4;
+
+/** かわいい層ではない（＝並べるとスキップを閉じる層）か。 */
+export const isPlain = (f) => (f.tier ?? 'cute') !== 'cute';
+
+export const tierOf = (f) => {
+  const t = f.tier ?? 'cute';
+  // かわいい層以外は枚数が少ないので髪では分けない。
+  // 分けるとその層どうしのペアが作れなくなる。
+  if (t !== 'cute') return t;
+  const h = f.v?.hairLength;
+  if (!Number.isFinite(h)) return t;
+  return `${t}#${Math.min(HAIR_BANDS - 1, Math.floor(h * HAIR_BANDS))}`;
+};
 
 export function choosePair(faces, model, stats, rand = Math.random, keys = KEYS, W = PAIR_WEIGHTS) {
   const n = faces.length;

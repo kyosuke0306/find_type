@@ -2,7 +2,7 @@
 
 import { FEATURES, KEYS, FACE_KEYS, LOOK_KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
-import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, tierOf } from './model.js';
+import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -209,7 +209,7 @@ async function showPair() {
   // かわいい層以外の回は必ず閉じる。
   // 飛ばされやすい回なのに、顔のパーツの幅がいちばん広いのがこの層なので、
   // 飛ばされるとこの層を入れた意味がなくなる（test/simulate.mjs で確認した）。
-  const plain = tierOf(a) !== 'cute' && tierOf(b) !== 'cute';
+  const plain = isPlain(a) && isPlain(b);
   state.locked = plain || (!!model && pairValue(a, b, model, state.stats) >= SKIP_LOCK);
   $('btn-skip').disabled = state.locked;
   $('skip-lock').hidden = !state.locked;
