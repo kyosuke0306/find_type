@@ -234,16 +234,28 @@ function buildDecorrelatePrompts(faces, n, opts) {
   }
   pairs.sort((x, y) => Math.abs(y.r) - Math.abs(x.r));
 
-  // 相関の強い組から、空いている側だけを拾う
+  // 相関の強い組から、空いている側だけを拾う。
+  // --pair を渡すと、その1組だけに枚数を集中させる。
+  // 枚数が少ないときに12枠へばらまくと1枠1〜2枚にしかならず、相関は動かない。
+  let use = pairs.slice(0, 6);
+  if (opts.pair) {
+    const want = opts.pair.split(',').map((x) => x.trim());
+    if (want.length !== 2 || want.some((k) => !FACE_KEYS.includes(k))) {
+      throw new Error(`--pair は項目キー2つをカンマ区切りで渡してください。使えるキー:\n  ${FACE_KEYS.join(' ')}`);
+    }
+    use = pairs.filter((p) => (p.a === want[0] && p.b === want[1]) || (p.a === want[1] && p.b === want[0]));
+    if (!use.length) throw new Error(`${want.join(' と ')} の組が見つかりません`);
+  }
   const targets = [];
-  for (const p of pairs.slice(0, 6)) {
+  for (const p of use) {
     const ma = med(p.a), mb = med(p.b);
     const q = [[[], []], [[], []]];
     for (const f of p.faces) q[f.raw[p.a] >= ma ? 1 : 0][f.raw[p.b] >= mb ? 1 : 0].push(f);
     const cells = [[0, 0], [0, 1], [1, 0], [1, 1]].map(([i, j]) => ({ i, j, n: q[i][j].length }))
       .sort((x, y) => x.n - y.n);
     for (const c of cells.slice(0, 2)) {
-      if (c.n > p.faces.length / 6) continue;   // そこそこ埋まっているなら要らない
+      // そこそこ埋まっているなら要らない。ただし組を名指しされたときは必ず作る。
+      if (!opts.pair && c.n > p.faces.length / 6) continue;
       targets.push({ a: p.a, b: p.b, ai: c.i, bi: c.j, have: c.n, r: p.r });
     }
   }
@@ -435,6 +447,7 @@ function parseArgs(argv) {
     else if (k === '--fill') a.fill = argv[++i] ?? 'data/faces.json';
     else if (k === '--spread') a.spread = true;
     else if (k === '--decorrelate') a.decorrelate = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : 'data/faces.json';
+    else if (k === '--pair') a.pair = argv[++i];
     else if (k === '--plain') a.plain = true;
     else if (k === '--female-ratio') a.femaleRatio = Number(argv[++i]);
     else if (k === '--concurrency') a.concurrency = Number(argv[++i]);
