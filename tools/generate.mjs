@@ -560,6 +560,15 @@ async function generateOne(key, model, prompt, imageSize) {
         '  Gemini の画像生成には課金の有効化が必要です: https://aistudio.google.com/ の "Set up Billing"\n' +
         '  課金を有効にしたくない場合は、別のツールで画像を作って tools/analyze.mjs に渡してください。');
     }
+    // 月額上限に当たった 429 も、待っても解消しない。
+    // レート制限として扱うと20秒ごとに再試行し続け、何も出ないまま止まって見える。
+    if (/spending cap|spend cap|quota.*exceed.*billing/i.test(msg)) {
+      throw new QuotaZeroError(
+        'プロジェクトの月額上限に達しています。\n' +
+        '  https://ai.studio/spend で上限を引き上げてください。\n' +
+        '  クレジット残高とは別の設定です。\n' +
+        `  ${msg}`);
+    }
     const wait = Number(/retry in ([\d.]+)s/i.exec(msg)?.[1] ?? 20);
     const e = new Error(`レート制限。${wait.toFixed(0)}秒待ちます`);
     e.retryAfter = wait;
