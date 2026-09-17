@@ -100,7 +100,7 @@ function buildStartScreen() {
     // 同梱プールでの実測値。npm run acc-check で確かめられる。
     // 顔・較正・ペアの選び方・測る項目のどれかを変えると動くので、
     // 公開する前に必ず確かめること（CLAUDE.md を参照）。
-    { v: 20, label: 'さくっと', acc: 80 },
+    { v: 20, label: 'さくっと', acc: 79 },
     { v: 30, label: 'おすすめ', acc: 82 },
     { v: 45, label: 'しっかり', acc: 85 },
     { v: 90, label: 'とことん', acc: 89 },
