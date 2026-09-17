@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { KEYS, normalizePool } from '../src/features.js';
-import { fit, predict, choosePair, updateStats, newStats, utilityDelta, tierOf } from '../src/model.js';
+import { fit, predict, choosePair, updateStats, newStats, utilityDelta, isPlain } from '../src/model.js';
 const W = process.env.PW ? JSON.parse(process.env.PW) : undefined;
 
 // --pool data/faces.json を渡すと、合成プールではなく実際の顔で検証する。
@@ -57,7 +57,7 @@ function makeUser(rand, nImportant = 4) {
   return { m, a: s.map(Math.log), keys: KEYS, important: idx };
 }
 
-const cuteness = (f) => (tierOf(f) === 'cute' ? 1 : 0);
+const cuteness = (f) => (isPlain(f) ? 0 : 1);
 
 function runSession(pool, user, rounds, rand, adaptive, attr) {
   const comparisons = [];
@@ -84,7 +84,7 @@ function runSession(pool, user, rounds, rand, adaptive, attr) {
 function evaluate(pool, user, model, rand, attr) {
   // 未知のペアで「真の好み」と一致するか。
   // かわいさを持たせたときは、それが打ち消し合う同じ層どうしで測る。
-  const from = attr ? pool.filter((f) => tierOf(f) === 'cute') : pool;
+  const from = attr ? pool.filter((f) => !isPlain(f)) : pool;
   let ok = 0, n = 600;
   for (let t = 0; t < n; t++) {
     const i = Math.floor(rand() * from.length);
@@ -110,7 +110,7 @@ function evaluate(pool, user, model, rand, attr) {
  * 渡さなければ合成プールを使う。
  */
 export function benchmark({ faces = null, rounds = 30, trials = 60, adaptive = true, attr = 0 } = {}) {
-  const real = faces ? normalizePool(faces).map((f) => ({ id: f.file, v: f.v, tier: f.tier })) : null;
+  const real = faces ? normalizePool(faces).map((f) => ({ id: f.file, v: f.v, tier: f.tier, hair: f.hair })) : null;
   const agg = { acc: 0, hit: 0, hit5: 0, merr: 0 };
   for (let t = 0; t < trials; t++) {
     const rand = mulberry(1000 + t);

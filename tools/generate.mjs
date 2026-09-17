@@ -67,10 +67,30 @@ const IDOL_AXES = {
   hairColor: ['jet black hair', 'dark brown hair', 'dyed light brown hair', 'dyed ash brown hair'],
 };
 
+// 髪の長さの範囲。--hair で切り替える。
+// ショートは「顔がどうであれ選ばない」という拒否として効きやすい。
+// そうなった回は顔の好みではなく髪の好みしか測れないので、
+// 顔を測りたいプールでは短い側を外して幅を狭める（test/simulate.mjs で確認済み）。
+// 幅は残すので「髪の長さ」自体は引き続き測れる。
+const HAIR_RANGE = {
+  all:  null,   // AXES.hair をそのまま使う
+  mid:  ['chin-length bob', 'shoulder-length hair', 'long hair past the chest'],
+  long: ['shoulder-length hair', 'long hair past the chest', 'very long hair past the waist'],
+};
+
 const EAST_ASIAN_AXES = {
   skin: ['very fair porcelain skin', 'fair skin', 'light skin with warm undertone', 'medium skin tone', 'lightly tanned skin'],
   hairColor: ['jet black hair', 'dark brown hair', 'dyed light brown hair', 'dyed ash brown hair', 'dyed bleached blonde hair'],
 };
+
+function resolveAxes(opts) {
+  const base = opts.vibe === 'idol'
+    ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES }
+    : { ...AXES, ...EAST_ASIAN_AXES };
+  const range = HAIR_RANGE[opts.hair ?? 'all'];
+  if (range === undefined) throw new Error(`--hair は ${Object.keys(HAIR_RANGE).join(' / ')} のどれかです`);
+  return range ? { ...base, hair: range } : base;
+}
 
 // 全カット共通の構図指定。ここがぶれると肌色・髪の長さの実測が狂う。
 const FRAMING_PARTS = [
@@ -174,7 +194,7 @@ const ARCHETYPES = [
 function buildPlainPrompts(n, opts) {
   const rand = mulberry(opts.seed);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
-  const axes = opts.vibe === 'idol' ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES } : { ...AXES, ...EAST_ASIAN_AXES };
+  const axes = resolveAxes(opts);
   const hairBag = makeBag(axes.hair, rand);
   const colorBag = makeBag(axes.hairColor, rand);
   const ageBag = makeBag(AXES.age, rand);
@@ -207,7 +227,7 @@ function buildPlainPrompts(n, opts) {
 function buildDecorrelatePrompts(faces, n, opts) {
   const rand = mulberry(opts.seed);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
-  const axes = opts.vibe === 'idol' ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES } : { ...AXES, ...EAST_ASIAN_AXES };
+  const axes = resolveAxes(opts);
   const hairBag = makeBag(axes.hair, rand);
   const colorBag = makeBag(axes.hairColor, rand);
   const ageBag = makeBag(AXES.age, rand);
@@ -295,13 +315,21 @@ const jaSide = (k, hi) => (hi ? FEATURES[KEYS.indexOf(k)].high : FEATURES[KEYS.i
 function buildSpreadPrompts(n, opts) {
   const rand = mulberry(opts.seed);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
-  const axes = opts.vibe === 'idol' ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES } : { ...AXES, ...EAST_ASIAN_AXES };
+  const axes = resolveAxes(opts);
   const hairBag = makeBag(axes.hair, rand);
   const colorBag = makeBag(axes.hairColor, rand);
   const ageBag = makeBag(AXES.age, rand);
+  // --archetype で型を1つに絞れる。特定の骨格を厚くしたいときに使う。
+  // パーツ単位の指示は効かないが、型ごと指定すると骨格が入れ替わる。
+  const book = opts.archetype
+    ? ARCHETYPES.filter((a) => a.ja === opts.archetype)
+    : ARCHETYPES;
+  if (!book.length) {
+    throw new Error(`--archetype が不正です。使える型:\n  ${ARCHETYPES.map((a) => a.ja).join(' ')}`);
+  }
   const out = [];
   for (let i = 0; i < n; i++) {
-    const a = ARCHETYPES[i % ARCHETYPES.length];
+    const a = book[i % book.length];
     // 同じ型でも髪と年齢は変える。型が2周目に入っても別人になるように。
     const variation = `Japanese woman, ${ageBag()}, ${a.en}, ${hairBag()}, ${colorBag()}`
       + ', still a strikingly pretty and cute face';
@@ -398,10 +426,18 @@ const PART_OF = {
 // 増やすと生成器が指示を取りこぼし、かわいさの指定も薄まる。
 const EXTRA_SPECS = 2;
 
+// --hair で短い側を外しているときは、「髪の長さ」を狙う言い回しも範囲内に収める。
+// 揃えないと「ロング限定のプールにピクシーカットを注文する」ことになり、
+// 生成器がどちらかを取りこぼして1枚まるごと無駄になる。
+const HAIR_PHRASES = {
+  mid:  ['a chin-length bob', 'very long hair past the chest'],
+  long: ['shoulder-length hair', 'very long hair past the waist'],
+};
+
 function buildFillPrompts(targets, n, opts) {
   const rand = mulberry(opts.seed);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
-  const axes = opts.vibe === 'idol' ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES } : { ...AXES, ...EAST_ASIAN_AXES };
+  const axes = resolveAxes(opts);
   const out = [];
   for (let i = 0; i < n; i++) {
     const tgt = targets[i % targets.length];
@@ -413,7 +449,9 @@ function buildFillPrompts(targets, n, opts) {
     // 顔が崩れる。狙い以外は、どれを引いてもかわいく見える語彙から選ぶ。
     // 狙いが1項目だけのときは、はっきりした言い回しを使う。
     // 端を1本だけ振るぶんには顔は崩れない。
-    const book = tgt.strong ? STRONG_PHRASES : FILL_PHRASES;
+    const hairPhrases = HAIR_PHRASES[opts.hair];
+    const base = tgt.strong ? STRONG_PHRASES : FILL_PHRASES;
+    const book = hairPhrases ? { ...base, hairLength: hairPhrases } : base;
     const phrases = KEYS.filter((k) => k !== 'ageLook' && k in set).map((k) => book[k][set[k]]);
     const extras = [
       ['eyes', 'eyes'], ['brows', 'brows'], ['shape', 'faceShape'],
@@ -428,8 +466,13 @@ function buildFillPrompts(targets, n, opts) {
     }
 
     const age = set.ageLook !== undefined ? book.ageLook[set.ageLook] : AXES.age[Math.floor(rand() * AXES.age.length)];
-    // 条件を並べると美しさの指定が薄まるので、最後にもう一度念を押す
-    const variation = `Japanese woman, ${age}, ${phrases.join(', ')}, still a strikingly pretty and cute face`;
+    // 条件を並べると美しさの指定が薄まるので、最後にもう一度念を押す。
+    // ただしこの念押しがあると、狙った端（大きな口など）が作れない。
+    // --soft は前置きのかわいさだけ残して、この念押しを外す。
+    // 前置きごと外す（--vibe neutral）と端は作れるが、顔の水準が
+    // 既存のプールから外れて、かわいさの層に混ぜられなくなる。
+    const tail = opts.soft ? '' : ', still a strikingly pretty and cute face';
+    const variation = `Japanese woman, ${age}, ${phrases.join(', ')}${tail}`;
     out.push({
       index: i, gender: 'woman', why: tgt.why,
       variation,
@@ -449,7 +492,11 @@ function parseArgs(argv) {
     else if (k === '--image-size') a.imageSize = argv[++i];
     else if (k === '--ethnicity') a.ethnicity = argv[++i];
     else if (k === '--vibe') a.vibe = argv[++i];
+    else if (k === '--hair') a.hair = argv[++i];
     else if (k === '--fill') a.fill = argv[++i] ?? 'data/faces.json';
+    else if (k === '--target') a.target = argv[++i];
+    else if (k === '--archetype') a.archetype = argv[++i];
+    else if (k === '--soft') a.soft = true;
     else if (k === '--spread') a.spread = true;
     else if (k === '--decorrelate') a.decorrelate = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : 'data/faces.json';
     else if (k === '--pair') a.pair = argv[++i];
@@ -489,6 +536,9 @@ function buildPrompts(n, opts) {
   const eth = ETHNICITY[opts.ethnicity] ?? ETHNICITY.japanese;
   let axes = ['japanese', 'eastasian'].includes(opts.ethnicity) ? { ...AXES, ...EAST_ASIAN_AXES } : AXES;
   if (opts.vibe === 'idol') axes = { ...axes, ...IDOL_AXES };
+  const hairRange = HAIR_RANGE[opts.hair ?? 'all'];
+  if (hairRange === undefined) throw new Error(`--hair は ${Object.keys(HAIR_RANGE).join(' / ')} のどれかです`);
+  if (hairRange) axes = { ...axes, hair: hairRange };
   const bags = Object.fromEntries(Object.entries(axes).map(([k, v]) => [k, makeBag(v, rand)]));
   const ethBag = makeBag(eth, rand);
   const out = [];
@@ -623,6 +673,24 @@ async function main() {
     fillNote = '顔の型をひと通り作って、実測値のばらつきを増やすための指定です。';
     console.log(`顔の型 ${ARCHETYPES.length} 種類で ${args.count} 件のプロンプトを作ります:`);
     for (const a of ARCHETYPES) console.log(`  - ${a.ja}`);
+    console.log();
+  } else if (args.target) {
+    // 1項目の片側だけを狙う。--fill の自動検出はしきい値を跨がないと拾わないので、
+    // 「端がもう少し欲しい」ときに手で指定するための入口。
+    const [key, side] = args.target.split(':');
+    if (!KEYS.includes(key)) {
+      throw new Error(`--target のキーが不正です。使えるキー:\n  ${KEYS.join(' ')}`);
+    }
+    if (side !== 'low' && side !== 'high') {
+      throw new Error('--target は <キー>:low または <キー>:high の形で渡してください');
+    }
+    const i = KEYS.indexOf(key);
+    const end = side === 'high' ? 1 : 0;
+    const label = side === 'high' ? FEATURES[i].highTag : FEATURES[i].lowTag;
+    const targets = [{ why: `${FEATURES[i].name}の「${label}」側を厚くする`, set: { [key]: end }, strong: true, harm: 9 }];
+    prompts = buildFillPrompts(targets, args.count, args);
+    fillNote = `${FEATURES[i].name}の「${label}」側を狙った指定です。`;
+    console.log(`${FEATURES[i].name}の「${label}」側を ${args.count} 件作ります。`);
     console.log();
   } else if (args.fill) {
     const faces = JSON.parse(await fs.readFile(path.resolve(args.fill), 'utf8')).faces;

@@ -2,7 +2,7 @@
 
 import { FEATURES, KEYS, FACE_KEYS, LOOK_KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
-import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, tierOf } from './model.js';
+import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -96,14 +96,14 @@ function buildStartScreen() {
      </button>`).join('');
   if (options.length >= 2) bindChoices(genderBox, (v) => { state.gender = v; });
 
-  // 精度は同梱プールでの実測値（node test/simulate.mjs <問数> 120 --pool data/faces.json）
   $('rounds-choices').innerHTML = [
-    // 114枚・較正後の実測（node test/simulate.mjs <問数> 200 --pool data/faces.json の
-    // adaptive 予測一致率）。顔を足したり較正を変えたら測り直す。
-    { v: 20, label: 'さくっと', acc: 81 },
-    { v: 30, label: 'おすすめ', acc: 85 },
-    { v: 45, label: 'しっかり', acc: 88 },
-    { v: 90, label: 'とことん', acc: 90 },
+    // 同梱プールでの実測値。npm run acc-check で確かめられる。
+    // 顔・較正・ペアの選び方・測る項目のどれかを変えると動くので、
+    // 公開する前に必ず確かめること（CLAUDE.md を参照）。
+    { v: 20, label: 'さくっと', acc: 79 },
+    { v: 30, label: 'おすすめ', acc: 82 },
+    { v: 45, label: 'しっかり', acc: 85 },
+    { v: 90, label: 'とことん', acc: 89 },
   ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
       <span class="big">${r.v}</span><span class="sub">${r.label}</span>
       <span class="acc">精度 ${r.acc}%</span></button>`).join('');
@@ -209,7 +209,7 @@ async function showPair() {
   // かわいい層以外の回は必ず閉じる。
   // 飛ばされやすい回なのに、顔のパーツの幅がいちばん広いのがこの層なので、
   // 飛ばされるとこの層を入れた意味がなくなる（test/simulate.mjs で確認した）。
-  const plain = tierOf(a) !== 'cute' && tierOf(b) !== 'cute';
+  const plain = isPlain(a) && isPlain(b);
   state.locked = plain || (!!model && pairValue(a, b, model, state.stats) >= SKIP_LOCK);
   $('btn-skip').disabled = state.locked;
   $('skip-lock').hidden = !state.locked;
@@ -305,7 +305,12 @@ async function finishSession() {
   const model = fit(cs);
   const loo = looAccuracy(cs);
 
-  const ranked = [...state.faces].sort((x, y) => score(model, y.v) - score(model, x.v));
+  // かわいい層からだけ選ぶ。
+  // それ以外の層は「その人の好みを測る」ために入れてあるだけで、
+  // 「あなたの好みの顔はこれです」として見せるためのものではない。
+  const shown = state.faces.filter((f) => !isPlain(f));
+  const ranked = [...(shown.length >= 3 ? shown : state.faces)]
+    .sort((x, y) => score(model, y.v) - score(model, x.v));
   const payload = {
     at: new Date().toISOString(),
     gender: state.gender,
