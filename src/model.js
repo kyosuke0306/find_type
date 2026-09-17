@@ -159,7 +159,7 @@ export function looAccuracy(comparisons, keys = KEYS, opts = {}) {
  * （W.hair。理由は下の scoring の中のコメント）。
  */
 // test/simulate.mjs で調整した重み
-export const PAIR_WEIGHTS = { gain: 2, spread: 0, unc: 1, fatigue: 0.6, hair: 3 };
+export const PAIR_WEIGHTS = { gain: 2, spread: 0, unc: 1, fatigue: 0.6, hair: 5 };
 
 /** かわいい層ではない（＝並べるとスキップを閉じる層）か。 */
 export const isPlain = (f) => (f.tier ?? 'cute') !== 'cute';
