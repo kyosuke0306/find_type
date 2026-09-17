@@ -3,7 +3,7 @@
 // 重視度は exp(a) * max(m, 1-m)^2 で決まるが、この値の水準は項目ごとに違う。
 // 理想値 m が端に寄りやすい項目は max(m, 1-m)^2 が最大4倍になるため、
 // 重視していなくても上位3つに紛れ込む。逆に中央へ寄る項目は重視していても埋もれる。
-// 実測では、上位3つに出る割合が項目間で 1.63倍 ひらいていた（本来はどれも 21.4%）。
+// 実測では、上位3つに出る割合が項目間で 1.44倍 ひらいていた（本来はどれも 21.4%）。
 //
 // そこで重視度に項目ごとの係数を掛けて水準をそろえる。
 //
@@ -29,18 +29,18 @@
 //
 // プールを大きく変えたら測り直す。
 export const SURFACE_BIAS = {
-  faceLength: 0.9080,
-  jawSharp: 0.8208,
-  eyeSize: 0.9830,
-  eyeTilt: 0.9087,
-  eyeDistance: 0.9233,
-  browEyeGap: 0.9788,
-  browAngle: 1.1172,
-  browArch: 1.2489,
-  noseWidth: 1.0519,
-  mouthWidth: 1.1495,
-  lipThick: 0.9743,
-  ageLook: 0.9357,
-  skinTone: 1.0943,
-  hairColor: 0.9875,
+  faceLength: 0.8933,
+  jawSharp: 0.8743,
+  eyeSize: 0.9831,
+  eyeTilt: 0.8439,
+  eyeDistance: 0.9935,
+  browEyeGap: 0.9607,
+  browAngle: 1.0851,
+  browArch: 1.1479,
+  noseWidth: 1.0690,
+  mouthWidth: 1.1030,
+  lipThick: 1.0813,
+  ageLook: 0.9022,
+  skinTone: 1.1188,
+  hairColor: 1.0086,
 };
