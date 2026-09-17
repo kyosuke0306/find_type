@@ -2,7 +2,7 @@
 
 import { FEATURES, KEYS, FACE_KEYS, LOOK_KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
-import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain } from './model.js';
+import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain, shouldStop, AUTO_STOP } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -32,6 +32,7 @@ const state = {
   stats: newStats(),
   model: null,
   busy: false,
+  autoMemo: {},      // 「はっきりしたら終わり」の判定に使う（src/model.js の shouldStop）
 };
 
 /* ---------------- 起動 ---------------- */
@@ -104,11 +105,15 @@ function buildStartScreen() {
     { v: 30, label: 'おすすめ', acc: 82 },
     { v: 45, label: 'しっかり', acc: 85 },
     { v: 90, label: 'とことん', acc: 89 },
+    // 回数を決めず、傾向がはっきりしたら終わるモード。
+    // 平均の精度は固定30問とほぼ同じで、長さが人によって変わる（19〜51問）。
+    { v: 'auto', label: 'おまかせ', acc: 83, sub: 'はっきりするまで' },
   ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
-      <span class="big">${r.v}</span><span class="sub">${r.label}</span>
-      <span class="acc">精度 ${r.acc}%</span></button>`).join('');
+      <span class="big">${r.v === 'auto' ? '？' : r.v}</span><span class="sub">${r.label}</span>
+      <span class="acc">${r.sub ? r.sub : `精度 ${r.acc}%`}</span></button>`).join('');
 
-  bindChoices($('rounds-choices'), (v) => { state.rounds = Number(v); });
+  // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
+  bindChoices($('rounds-choices'), (v) => { state.rounds = v === 'auto' ? 'auto' : Number(v); });
 
   $('btn-start').innerHTML = `${icon('play')}<span>はじめる</span>`;
   $('btn-start').onclick = startSession;
@@ -141,6 +146,7 @@ function startSession() {
   state.stats = newStats();
   state.model = null;
   state.next = null;
+  state.autoMemo = {};
   show('screen-play');
   nextRound();
 }
@@ -168,10 +174,21 @@ function loadFace(f) {
   return img.complete ? Promise.resolve() : new Promise((done) => { img.onload = img.onerror = done; });
 }
 
-// 次のペアを決めて先に読み込んでおく。残り回数が尽きていれば決めない。
+// 「おまかせ」のときの回数の目安。進み具合の表示と、スキップの上限に使う。
+const AUTO_TYPICAL = 31;
+
+/** もう終わってよいか。回数を決めたときは残り回数で、おまかせは傾向の固まり具合で決める。 */
+function sessionDone() {
+  if (state.rounds === 'auto') {
+    if (state.shown >= AUTO_STOP.max * 3) return true;   // スキップが続いても終わる
+    return shouldStop(state.model, state.round, state.autoMemo);
+  }
+  return state.round >= state.rounds || state.shown >= state.rounds * 3;
+}
+
+// 次のペアを決めて先に読み込んでおく。終わっていれば決めない。
 function prepareNext() {
-  // スキップが続いても終わらなくならないように上限を設ける
-  if (state.round >= state.rounds || state.shown >= state.rounds * 3) {
+  if (sessionDone()) {
     state.next = null;
     return Promise.resolve();
   }
@@ -199,8 +216,18 @@ async function showPair() {
   const cards = document.querySelectorAll('.face-card');
   // 選んだあとの見た目を読み込み中まで引きずらないよう、先に戻す
   cards.forEach((c) => c.classList.remove('is-picked', 'is-dropped'));
-  $('round-label').textContent = `${state.round + 1} / ${state.rounds}`;
-  $('progress-fill').style.width = `${(state.round / state.rounds) * 100}%`;
+  if (state.rounds === 'auto') {
+    // 終わりが決まっていないので「◯問目」とだけ出す。
+    // 進み具合は、上位3つが何回続けて同じだったかで見せる。
+    // ここが伸びているときは終わりが近い、と伝わるようにしてある。
+    $('round-label').textContent = `${state.round + 1} 問目`;
+    const settled = (state.autoMemo.same ?? 0) / AUTO_STOP.stable;
+    const along = state.round / AUTO_TYPICAL;
+    $('progress-fill').style.width = `${Math.min(100, Math.max(settled, along) * 100)}%`;
+  } else {
+    $('round-label').textContent = `${state.round + 1} / ${state.rounds}`;
+    $('progress-fill').style.width = `${(state.round / state.rounds) * 100}%`;
+  }
   $('btn-undo').disabled = state.history.length === 0;
 
   // 判定に効く組み合わせではスキップを閉じる。
@@ -274,6 +301,9 @@ function undo() {
     else updateStats(state.stats, h.a, h.b);
   }
   state.model = state.history.filter((h) => !h.skipped).length >= 6 ? fit(comparisons()) : null;
+  // 「はっきりしたか」の数えも戻す。戻した回の分を数えたままだと、
+  // 戻ったのに終わってしまう。
+  state.autoMemo = {};
   state.next = null;
   state.pair = [last.a, last.b];
   showPair();

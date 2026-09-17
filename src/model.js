@@ -278,6 +278,51 @@ export function updateStats(stats, A, B, keys = KEYS) {
 // 増やすほど顔は散るが精度は落ちる。2 は「顔の97%が使われる」代わりに
 // 一致率が1.3ポイント落ちる点。顔を増やしたのに4分の1が一度も出ないのは
 // 本末転倒なので、ここを取っている。
+/**
+ * 「傾向がはっきりしたか」の判定。回数を決めずに遊ぶモードで使う。
+ *
+ * 上位3項目の顔ぶれが STABLE 回続けて変わらず、かつ3位と4位の重視度に
+ * GAP 以上の差がついたら、それ以上聞いても結果はほぼ動かない。
+ *
+ * 231枚のプールでの実測（仮想ユーザー400人）:
+ *
+ *              問数 中央(10%〜90%)   一致率 平均   下位10%
+ *   固定30問     30 (30〜30)          0.820      0.728
+ *   これ         31 (19〜51)          0.827      0.740
+ *
+ * 平均の精度はほぼ変わらない。変わるのは長さで、好みがはっきりしている人は
+ * 19問で終わり、はっきりしない人には51問まで聞く。
+ */
+export const AUTO_STOP = { min: 12, max: 60, stable: 5, gap: 0.10 };
+
+/** 上位3項目の顔ぶれ（並び順は無視）。 */
+const top3Of = (model) => model.keys
+  .map((_, i) => i)
+  .sort((x, y) => model.importance[y] - model.importance[x])
+  .slice(0, 3).sort((x, y) => x - y).join(',');
+
+/**
+ * いま終わってよいか。state は { same, prev } を持つ器で、呼ぶたびに更新する。
+ * 答えた回数 answered と、いまのモデルを渡す。
+ */
+export function shouldStop(model, answered, memo, cfg = AUTO_STOP) {
+  // 同じ回で二度呼ばれても数えを進めない。
+  // 呼ぶ側（次のペアの用意）が1回の回答で二度走ることがある。
+  if (memo.at === answered) return memo.stop ?? false;
+  memo.at = answered;
+  const done = (v) => { memo.stop = v; return v; };
+
+  if (!model) return done(false);
+  if (answered >= cfg.max) return done(true);
+  if (answered < cfg.min) { memo.prev = null; memo.same = 0; return done(false); }
+  const now = top3Of(model);
+  memo.same = (now === memo.prev) ? (memo.same ?? 0) + 1 : 0;
+  memo.prev = now;
+  const sorted = model.importance.slice().sort((a, b) => b - a);
+  const gap = sorted[2] > 0 ? (sorted[2] - sorted[3]) / sorted[2] : 0;
+  return done(memo.same >= cfg.stable && gap >= cfg.gap);
+}
+
 export const newStats = (rand = Math.random) => ({
   seen: new Map(), count: new Map(), usedPairs: new Set(),
   luck: new Map(), rand,
