@@ -304,7 +304,12 @@ async function finishSession() {
   const model = fit(cs);
   const loo = looAccuracy(cs);
 
-  const ranked = [...state.faces].sort((x, y) => score(model, y.v) - score(model, x.v));
+  // かわいい層からだけ選ぶ。
+  // それ以外の層は「その人の好みを測る」ために入れてあるだけで、
+  // 「あなたの好みの顔はこれです」として見せるためのものではない。
+  const shown = state.faces.filter((f) => !isPlain(f));
+  const ranked = [...(shown.length >= 3 ? shown : state.faces)]
+    .sort((x, y) => score(model, y.v) - score(model, x.v));
   const payload = {
     at: new Date().toISOString(),
     gender: state.gender,
