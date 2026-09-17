@@ -481,6 +481,7 @@ function parseArgs(argv) {
     else if (k === '--vibe') a.vibe = argv[++i];
     else if (k === '--hair') a.hair = argv[++i];
     else if (k === '--fill') a.fill = argv[++i] ?? 'data/faces.json';
+    else if (k === '--target') a.target = argv[++i];
     else if (k === '--spread') a.spread = true;
     else if (k === '--decorrelate') a.decorrelate = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : 'data/faces.json';
     else if (k === '--pair') a.pair = argv[++i];
@@ -657,6 +658,24 @@ async function main() {
     fillNote = '顔の型をひと通り作って、実測値のばらつきを増やすための指定です。';
     console.log(`顔の型 ${ARCHETYPES.length} 種類で ${args.count} 件のプロンプトを作ります:`);
     for (const a of ARCHETYPES) console.log(`  - ${a.ja}`);
+    console.log();
+  } else if (args.target) {
+    // 1項目の片側だけを狙う。--fill の自動検出はしきい値を跨がないと拾わないので、
+    // 「端がもう少し欲しい」ときに手で指定するための入口。
+    const [key, side] = args.target.split(':');
+    if (!KEYS.includes(key)) {
+      throw new Error(`--target のキーが不正です。使えるキー:\n  ${KEYS.join(' ')}`);
+    }
+    if (side !== 'low' && side !== 'high') {
+      throw new Error('--target は <キー>:low または <キー>:high の形で渡してください');
+    }
+    const i = KEYS.indexOf(key);
+    const end = side === 'high' ? 1 : 0;
+    const label = side === 'high' ? FEATURES[i].highTag : FEATURES[i].lowTag;
+    const targets = [{ why: `${FEATURES[i].name}の「${label}」側を厚くする`, set: { [key]: end }, strong: true, harm: 9 }];
+    prompts = buildFillPrompts(targets, args.count, args);
+    fillNote = `${FEATURES[i].name}の「${label}」側を狙った指定です。`;
+    console.log(`${FEATURES[i].name}の「${label}」側を ${args.count} 件作ります。`);
     console.log();
   } else if (args.fill) {
     const faces = JSON.parse(await fs.readFile(path.resolve(args.fill), 'utf8')).faces;
