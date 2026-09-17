@@ -110,7 +110,7 @@ function evaluate(pool, user, model, rand, attr) {
  * 渡さなければ合成プールを使う。
  */
 export function benchmark({ faces = null, rounds = 30, trials = 60, adaptive = true, attr = 0 } = {}) {
-  const real = faces ? normalizePool(faces).map((f) => ({ id: f.file, v: f.v, tier: f.tier })) : null;
+  const real = faces ? normalizePool(faces).map((f) => ({ id: f.file, v: f.v, tier: f.tier, hair: f.hair })) : null;
   const agg = { acc: 0, hit: 0, hit5: 0, merr: 0 };
   for (let t = 0; t < trials; t++) {
     const rand = mulberry(1000 + t);

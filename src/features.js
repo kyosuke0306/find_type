@@ -59,6 +59,18 @@ export const PAIR_ONLY_KEYS = PAIR_ONLY_FEATURES.map((f) => f.key);
 // 正規化する値。測る対象ではないものも、ペアを選ぶために揃えておく。
 export const NORM_KEYS = [...KEYS, ...PAIR_ONLY_KEYS];
 
+// ペアを選ぶときに使う髪の長さ（0..1）。
+// v.hairLength は順位で正規化した値なので「プールの中での順位差」しか表せない。
+// 全員ロングのプールを作っても順位はまた0〜1に広がるので、肩までと腰までを
+// 「離れた2枚」と見なしてしまう一方、本当に避けたい坊主とロングの差は
+// 表せなくなる。ペアを揃える目的には実測の長さそのものが要る。
+// 分母はあご下への伸び（両目間距離を1とする）の実測上限。
+const HAIR_FULL = 2;
+export const hairOf = (f) => {
+  const x = f.raw?.hairLength;
+  return Number.isFinite(x) ? Math.min(1, Math.max(0, x / HAIR_FULL)) : 0.5;
+};
+
 // このアプリで知りたいのは顔のパーツの好み。
 // 髪と肌は「顔」ではないので、結果では分けて扱う。
 export const LOOK_KEYS = ['skinTone', 'hairColor'];
@@ -146,7 +158,7 @@ export function cuteScore(m, importance, usable = null) {
 export function normalizePool(faces) {
   const n = faces.length;
   if (n === 0) return [];
-  const out = faces.map((f) => ({ ...f, v: {} }));
+  const out = faces.map((f) => ({ ...f, v: {}, hair: hairOf(f) }));
   for (const key of NORM_KEYS) {
     const idx = out.map((_, i) => i).filter((i) => Number.isFinite(out[i].raw?.[key]));
     idx.sort((a, b) => out[a].raw[key] - out[b].raw[key]);

@@ -200,7 +200,9 @@ export function choosePair(faces, model, stats, rand = Math.random, keys = KEYS,
     // 「顔がどうであれ短い方は選ばない」人の回が顔の判定に化けてしまう。
     // 層のように硬く切ると選べるペアが減って適応の効きが落ちるので、
     // 近いペアを優先しつつ必要なら離れたペアも選べるようにしてある。
-    const hairGap = Math.abs(A.v.hairLength - B.v.hairLength);
+    // 順位ではなく実測の長さで測る（features.js の hairOf を参照）。
+    // 持っていない顔（合成プールなど）は 0.5 扱いで、減点はほぼ効かない。
+    const hairGap = Math.abs((A.hair ?? 0.5) - (B.hair ?? 0.5));
 
     const s = W.gain * gain - W.spread * spread + W.unc * uncertainty
       - W.fatigue * fatigue - (W.hair ?? 0) * hairGap + rand() * 0.05;
