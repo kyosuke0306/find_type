@@ -159,7 +159,7 @@ export function looAccuracy(comparisons, keys = KEYS, opts = {}) {
  * （W.hair。理由は下の scoring の中のコメント）。
  */
 // test/simulate.mjs で調整した重み
-export const PAIR_WEIGHTS = { gain: 2, spread: 0, unc: 1, fatigue: 0.6, hair: 5 };
+export const PAIR_WEIGHTS = { gain: 2, spread: 0, unc: 1, fatigue: 0.6, hair: 5, luck: 1 };
 
 /** かわいい層ではない（＝並べるとスキップを閉じる層）か。 */
 export const isPlain = (f) => (f.tier ?? 'cute') !== 'cute';
@@ -204,8 +204,13 @@ export function choosePair(faces, model, stats, rand = Math.random, keys = KEYS,
     // 持っていない顔（合成プールなど）は 0.5 扱いで、減点はほぼ効かない。
     const hairGap = Math.abs((A.hair ?? 0.5) - (B.hair ?? 0.5));
 
+    // luck は回ごとの贔屓。同じくらい効くペアが何通りもあるとき、
+    // どれを選ぶかを回ごとに変えて、毎回ちがう顔が出るようにする。
+    const luck = luckOf(stats, A.id) + luckOf(stats, B.id);
+
     const s = W.gain * gain - W.spread * spread + W.unc * uncertainty
-      - W.fatigue * fatigue - (W.hair ?? 0) * hairGap + rand() * 0.05;
+      - W.fatigue * fatigue - (W.hair ?? 0) * hairGap
+      + (W.luck ?? 0) * luck + rand() * 0.05;
     if (s > bestScore) { bestScore = s; best = [A, B]; }
   }
   // 候補を引き当てられなかったとき（片方の層を引き尽くしたなど）も層はまたがない
@@ -255,4 +260,21 @@ export function updateStats(stats, A, B, keys = KEYS) {
   }
 }
 
-export const newStats = () => ({ seen: new Map(), count: new Map(), usedPairs: new Set() });
+// 1回ぶんの記録。
+// luck は「この回だけ、この顔を贔屓する」ための乱数。
+// これがないと、判定に効くペアの選び方が毎回同じ状態から始まるので、
+// 序盤は決まった顔ばかり出る（231枚のプールで、50回遊んでも67枚は
+// 一度も出てこなかった）。回ごとに贔屓を変えることで、
+// 同じくらい判定に効く顔の中から毎回ちがう顔が選ばれる。
+export const newStats = (rand = Math.random) => ({
+  seen: new Map(), count: new Map(), usedPairs: new Set(),
+  luck: new Map(), rand,
+});
+
+/** その回かぎりの顔ごとの贔屓（0..1）。初めて見る顔のぶんだけ作る。 */
+function luckOf(stats, id) {
+  if (!stats?.luck) return 0.5;
+  let v = stats.luck.get(id);
+  if (v === undefined) { v = (stats.rand ?? Math.random)(); stats.luck.set(id, v); }
+  return v;
+}
