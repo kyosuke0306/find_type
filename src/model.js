@@ -159,7 +159,7 @@ export function looAccuracy(comparisons, keys = KEYS, opts = {}) {
  * （W.hair。理由は下の scoring の中のコメント）。
  */
 // test/simulate.mjs で調整した重み
-export const PAIR_WEIGHTS = { gain: 2, spread: 0, unc: 1, fatigue: 0.6, hair: 5, luck: 1 };
+export const PAIR_WEIGHTS = { gain: 2, spread: 0, unc: 1, fatigue: 0.6, hair: 5, luck: 2 };
 
 /** かわいい層ではない（＝並べるとスキップを閉じる層）か。 */
 export const isPlain = (f) => (f.tier ?? 'cute') !== 'cute';
@@ -263,9 +263,21 @@ export function updateStats(stats, A, B, keys = KEYS) {
 // 1回ぶんの記録。
 // luck は「この回だけ、この顔を贔屓する」ための乱数。
 // これがないと、判定に効くペアの選び方が毎回同じ状態から始まるので、
-// 序盤は決まった顔ばかり出る（231枚のプールで、50回遊んでも67枚は
-// 一度も出てこなかった）。回ごとに贔屓を変えることで、
+// 序盤は決まった顔ばかり出る。回ごとに贔屓を変えることで、
 // 同じくらい判定に効く顔の中から毎回ちがう顔が選ばれる。
+//
+// 231枚のプールで60回ずつ遊ばせた実測（W.luck を振ったもの）:
+//
+//   W.luck   出た顔   一度も出ない   1問目の種類   一致率(30問)
+//      0      174枚       57枚          44種         0.832
+//      1      212枚       19枚          40種         0.823
+//      2      224枚        7枚          52種         0.819   ← これを使う
+//      4      227枚        4枚          55種         0.814
+//      8      230枚        1枚          63種         0.804
+//
+// 増やすほど顔は散るが精度は落ちる。2 は「顔の97%が使われる」代わりに
+// 一致率が1.3ポイント落ちる点。顔を増やしたのに4分の1が一度も出ないのは
+// 本末転倒なので、ここを取っている。
 export const newStats = (rand = Math.random) => ({
   seen: new Map(), count: new Map(), usedPairs: new Set(),
   luck: new Map(), rand,
