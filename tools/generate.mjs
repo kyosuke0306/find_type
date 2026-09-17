@@ -466,8 +466,13 @@ function buildFillPrompts(targets, n, opts) {
     }
 
     const age = set.ageLook !== undefined ? book.ageLook[set.ageLook] : AXES.age[Math.floor(rand() * AXES.age.length)];
-    // 条件を並べると美しさの指定が薄まるので、最後にもう一度念を押す
-    const variation = `Japanese woman, ${age}, ${phrases.join(', ')}, still a strikingly pretty and cute face`;
+    // 条件を並べると美しさの指定が薄まるので、最後にもう一度念を押す。
+    // ただしこの念押しがあると、狙った端（大きな口など）が作れない。
+    // --soft は前置きのかわいさだけ残して、この念押しを外す。
+    // 前置きごと外す（--vibe neutral）と端は作れるが、顔の水準が
+    // 既存のプールから外れて、かわいさの層に混ぜられなくなる。
+    const tail = opts.soft ? '' : ', still a strikingly pretty and cute face';
+    const variation = `Japanese woman, ${age}, ${phrases.join(', ')}${tail}`;
     out.push({
       index: i, gender: 'woman', why: tgt.why,
       variation,
@@ -491,6 +496,7 @@ function parseArgs(argv) {
     else if (k === '--fill') a.fill = argv[++i] ?? 'data/faces.json';
     else if (k === '--target') a.target = argv[++i];
     else if (k === '--archetype') a.archetype = argv[++i];
+    else if (k === '--soft') a.soft = true;
     else if (k === '--spread') a.spread = true;
     else if (k === '--decorrelate') a.decorrelate = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : 'data/faces.json';
     else if (k === '--pair') a.pair = argv[++i];
