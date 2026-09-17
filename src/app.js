@@ -97,11 +97,12 @@ function buildStartScreen() {
   if (options.length >= 2) bindChoices(genderBox, (v) => { state.gender = v; });
 
   $('rounds-choices').innerHTML = [
-    // 114枚・較正後の実測（node test/simulate.mjs <問数> 300 --pool data/faces.json の
-    // adaptive 予測一致率）。顔を足したり較正を変えたら測り直す。
+    // 同梱プールでの実測値。npm run acc-check で確かめられる。
+    // 顔・較正・ペアの選び方・測る項目のどれかを変えると動くので、
+    // 公開する前に必ず確かめること（CLAUDE.md を参照）。
     { v: 20, label: 'さくっと', acc: 80 },
-    { v: 30, label: 'おすすめ', acc: 83 },
-    { v: 45, label: 'しっかり', acc: 86 },
+    { v: 30, label: 'おすすめ', acc: 82 },
+    { v: 45, label: 'しっかり', acc: 85 },
     { v: 90, label: 'とことん', acc: 89 },
   ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
       <span class="big">${r.v}</span><span class="sub">${r.label}</span>
