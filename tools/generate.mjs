@@ -319,9 +319,17 @@ function buildSpreadPrompts(n, opts) {
   const hairBag = makeBag(axes.hair, rand);
   const colorBag = makeBag(axes.hairColor, rand);
   const ageBag = makeBag(AXES.age, rand);
+  // --archetype で型を1つに絞れる。特定の骨格を厚くしたいときに使う。
+  // パーツ単位の指示は効かないが、型ごと指定すると骨格が入れ替わる。
+  const book = opts.archetype
+    ? ARCHETYPES.filter((a) => a.ja === opts.archetype)
+    : ARCHETYPES;
+  if (!book.length) {
+    throw new Error(`--archetype が不正です。使える型:\n  ${ARCHETYPES.map((a) => a.ja).join(' ')}`);
+  }
   const out = [];
   for (let i = 0; i < n; i++) {
-    const a = ARCHETYPES[i % ARCHETYPES.length];
+    const a = book[i % book.length];
     // 同じ型でも髪と年齢は変える。型が2周目に入っても別人になるように。
     const variation = `Japanese woman, ${ageBag()}, ${a.en}, ${hairBag()}, ${colorBag()}`
       + ', still a strikingly pretty and cute face';
@@ -482,6 +490,7 @@ function parseArgs(argv) {
     else if (k === '--hair') a.hair = argv[++i];
     else if (k === '--fill') a.fill = argv[++i] ?? 'data/faces.json';
     else if (k === '--target') a.target = argv[++i];
+    else if (k === '--archetype') a.archetype = argv[++i];
     else if (k === '--spread') a.spread = true;
     else if (k === '--decorrelate') a.decorrelate = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : 'data/faces.json';
     else if (k === '--pair') a.pair = argv[++i];
