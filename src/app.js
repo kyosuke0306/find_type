@@ -120,8 +120,11 @@ function buildStartScreen() {
   ];
   const roundNote = (v) => {
     const r = ROUNDS.find((x) => String(x.v) === String(v)) ?? ROUNDS[1];
-    return r.note ? `<b>${r.label}</b> ・ ${r.note}`
+    const head = r.note ? `<b>${r.label}</b> ・ ${r.note}`
       : `<b>${r.label}</b> ・ 精度 ${r.acc}%`;
+    // 「はじめる」ボタンは置かず、選んだものをもう一度押すと始まる。
+    // 押せば始まると分からないと動けないので、必ず添える。
+    return `${head}<span class="rounds-go">${icon('play')}タップしてはじめる</span>`;
   };
   $('rounds-choices').innerHTML = ROUNDS.map((r) =>
     `<button class="choice choice-num${String(r.v) === String(state.rounds) ? ' is-on' : ''}" data-value="${r.v}"
@@ -130,13 +133,19 @@ function buildStartScreen() {
   $('rounds-note').innerHTML = roundNote(state.rounds);
 
   // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
-  bindChoices($('rounds-choices'), (v) => {
+  // すでに選ばれているものをもう一度押したら始める。
+  // 初めて押したときは選ぶだけ（説明が入れ替わる）。
+  $('rounds-choices').onclick = (e) => {
+    const b = e.target.closest('.choice');
+    if (!b) return;
+    if (b.classList.contains('is-on')) { startSession(); return; }
+    $('rounds-choices').querySelectorAll('.choice').forEach((c) => c.classList.remove('is-on'));
+    b.classList.add('is-on');
+    const v = b.dataset.value;
     state.rounds = v === 'auto' ? 'auto' : Number(v);
     $('rounds-note').innerHTML = roundNote(v);
-  });
+  };
 
-  $('btn-start').innerHTML = `${icon('play')}<span>はじめる</span>`;
-  $('btn-start').onclick = startSession;
 
   const last = localStorage.getItem(STORE_KEY);
   $('btn-last-result').hidden = !last;
