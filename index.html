@@ -134,6 +134,7 @@
     </div>
 
     <div class="card reveal consistency-card" style="--i:5">
+      <h2 class="card-title" id="t-accuracy"></h2>
       <div class="gauge">
         <svg viewBox="0 0 100 100" aria-hidden="true">
           <circle class="gauge-track" cx="50" cy="50" r="42"/>
@@ -147,15 +148,18 @@
       </div>
     </div>
 
-    <!-- 測った好みから、その場で理想の顔を作る。プールから選ぶのではない。 -->
+    <!-- 測った好みから、その場で理想の顔を作る。プールから選ぶのではない。
+         課金するので、他のカードとは見た目をはっきり分ける。 -->
     <div class="card reveal ideal-card" style="--i:6">
+      <p class="ideal-badge">特別</p>
       <h2 class="card-title" id="t-ideal"></h2>
-      <p class="card-note" id="ideal-note">あなたの好みから、世界に1枚だけの顔をその場で作ります</p>
+      <p class="ideal-lead" id="ideal-note"></p>
       <div class="ideal-stage" id="ideal-stage" hidden>
-        <img id="ideal-img" alt="あなたの理想の顔">
+        <img id="ideal-img" alt="あなただけの理想の顔">
       </div>
       <p class="ideal-status" id="ideal-status" hidden></p>
       <button id="btn-ideal" class="btn btn-primary btn-block btn-icon"></button>
+      <p class="ideal-price" id="ideal-price-note"></p>
     </div>
 
     <div class="actions">
