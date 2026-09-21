@@ -2,7 +2,7 @@
 
 import { FEATURES, KEYS, FACE_KEYS, LOOK_KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
-import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain, shouldStop, AUTO_STOP } from './model.js';
+import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain, shouldStop, AUTO_STOP, estimateAccuracy, predict, ACC_FIT } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -32,7 +32,11 @@ const state = {
   stats: newStats(),
   model: null,
   busy: false,
-  autoMemo: {},      // 「はっきりしたら終わり」の判定に使う（src/model.js の shouldStop）
+  autoMemo: {},      // 終了判定に使う（src/model.js の shouldStop）
+  // 出題した時点の予測がどれだけ当たったか。推定精度のもとになる。
+  // 毎回ただで数えられるので、1問ごとに推定を更新できる。
+  preqOk: 0,
+  preqN: 0,
 };
 
 /* ---------------- 起動 ---------------- */
@@ -150,6 +154,8 @@ function startSession() {
   state.model = null;
   state.next = null;
   state.autoMemo = {};
+  state.preqOk = 0;
+  state.preqN = 0;
   show('screen-play');
   nextRound();
 }
@@ -197,6 +203,14 @@ function prepareNext() {
   }
   state.next = decidePair();
   return Promise.all(state.next.map(loadFace));
+}
+
+/** 出題時の予測の的中率を履歴から数え直す。推定精度のもとになる。 */
+function recountPreq() {
+  const hits = state.history.filter((h) => h.hit !== null && h.hit !== undefined);
+  state.preqN = hits.length;
+  state.preqOk = hits.filter((h) => h.hit).length;
+  state.autoMemo.preq = state.preqN > 0 ? state.preqOk / state.preqN : undefined;
 }
 
 function nextRound() {
@@ -265,7 +279,12 @@ function choose(side) {
   cards[1 - side].classList.add('is-dropped');
   state.busy = true;
 
-  state.history.push({ a, b, winner: win.id, skipped: false });
+  // 出題した時点の予測が当たっていたかを記録する（モデルがあるときだけ）。
+  // 戻るで数え直せるよう、履歴に持たせる。
+  const hit = state.model ? (predict(state.model, a.v, b.v) > 0.5) === (side === 0) : null;
+
+  state.history.push({ a, b, winner: win.id, skipped: false, hit });
+  recountPreq();
   updateStats(state.stats, a, b);
   state.round++;
   // 選択が増えるたび再推定し、次のペア選びに反映する
@@ -304,9 +323,10 @@ function undo() {
     else updateStats(state.stats, h.a, h.b);
   }
   state.model = state.history.filter((h) => !h.skipped).length >= 6 ? fit(comparisons()) : null;
-  // 「はっきりしたか」の数えも戻す。戻した回の分を数えたままだと、
+  // 終了判定の数えも戻す。戻した回の分を数えたままだと、
   // 戻ったのに終わってしまう。
   state.autoMemo = {};
+  recountPreq();
   state.next = null;
   state.pair = [last.a, last.b];
   showPair();
@@ -351,6 +371,8 @@ async function finishSession() {
     skipped: state.history.length - cs.length,
     m: model.m, importance: model.importance, support: model.support,
     loo, trainAccuracy: model.trainAccuracy,
+    // 出題時の予測の的中率。推定精度（accRange）のもとになる。
+    preq: state.preqN > 0 ? state.preqOk / state.preqN : null,
     poolSize: state.faces.length,
     usable: [...state.usable],
     top: ranked.slice(0, 3).map((f) => f.id),
@@ -434,13 +456,14 @@ function buildSlides(r) {
         : Math.abs(score) >= 0.45 ? 'はっきりと出ています' : 'どちらかといえば、です'}</p>`,
   });
 
+  const est = accRange(r);
   slides.push({
     cls: 'st-consist',
-    html: `<p class="st-kicker">選び方のブレは</p>
-      <h2 class="st-big"><span class="st-num" data-num="${pct}">0%</span></h2>
-      <p class="st-lead">${pct >= 85 ? '好みが<b>はっきり</b>しています'
-        : pct >= 72 ? '好みは<b>一貫</b>しています'
-        : pct >= 60 ? '<b>ややブレ</b>がありました'
+    html: `<p class="st-kicker">この診断が当たる確からしさは</p>
+      <h2 class="st-big"><span class="st-num" data-num="${est.mid}">0%</span></h2>
+      <p class="st-lead">${pct >= 78 ? '<b>迷いなく</b>選べていました'
+        : pct >= 68 ? '好みは<b>一貫</b>しています'
+        : pct >= 60 ? '<b>少し迷いながら</b>選んでいました'
         : '<b>気分で選んで</b>いたようです'}</p>`,
   });
 
@@ -505,6 +528,22 @@ const usableOf = (r) => (r.usable ? new Set(r.usable) : new Set(KEYS));
  * 部位のまとめがまた別、と分母が3通りあり、同じ項目が 37% と 46% の
  * 2通りで出ていた。分母をそろえると、部位の % は内訳の % の合計になる。
  */
+/**
+ * この診断がどれくらい当たるかの見積もり（%の幅）。
+ * 推定には6ポイントほどの誤差があるので、点ではなく幅で出す。
+ * 見積もり方は src/model.js の estimateAccuracy を参照。
+ */
+function accRange(r) {
+  const preq = r.preq ?? (r.loo ?? null);
+  const mid = estimateAccuracy(r.rounds, preq ?? undefined);
+  const half = ACC_FIT.mae;
+  return {
+    mid: Math.round(mid * 100),
+    lo: Math.round(Math.max(0.5, mid - half) * 100),
+    hi: Math.round(Math.min(0.97, mid + half) * 100),
+  };
+}
+
 function faceShares(r) {
   const can = usableOf(r);
   const total = FACE_KEYS.reduce((s, k) => s + (can.has(k) ? r.importance[KEYS.indexOf(k)] : 0), 0) || 1;
@@ -580,10 +619,18 @@ function renderResult(r) {
   renderFaceMap(r);
   renderFeatures(r);
 
-  const pct = Math.round((r.loo ?? r.trainAccuracy) * 100);
-  $('consistency-label').textContent = pct >= 85 ? '好みがはっきりしています'
-    : pct >= 72 ? '好みは一貫しています'
-    : pct >= 60 ? 'ややブレがあります'
+  // 出すのは「この診断がどれくらい当たるか」。
+  // 以前はブレの少なさ（loo）をそのまま％で出していたが、あれは
+  // 出題されたペアだけで測った正答率で、出題は常に「モデルが
+  // いちばん自信のないペア」なので、どれだけ答えても70%前後から動かない。
+  // 65%と出ても診断が65%しか当たらないという意味ではなかった。
+  const est = accRange(r);
+  $('consistency-num').textContent = `${est.lo}–${est.hi}%`;
+  // ブレ具合は数字にせず、言葉だけで伝える。
+  const loo = Math.round((r.loo ?? r.trainAccuracy) * 100);
+  $('consistency-label').textContent = loo >= 78 ? '迷いなく選べています'
+    : loo >= 68 ? '好みは一貫しています'
+    : loo >= 60 ? '少し迷いながら選んでいます'
     : '気分で選んでいるかも';
 
   $('chosen-strip').innerHTML = r.chosen.filter((id) => srcOf(id))
@@ -598,8 +645,7 @@ function renderResult(r) {
   requestAnimationFrame(() => {
     document.querySelectorAll('.feat-fill, .fm-fill').forEach((el) => { el.style.width = el.dataset.w; });
     document.querySelectorAll('.marker, .style-marker').forEach((el) => { el.style.left = el.dataset.left; });
-    $('gauge-fill').style.strokeDashoffset = String(264 - 264 * (pct / 100));
-    countUp($('consistency-num'), pct);
+    $('gauge-fill').style.strokeDashoffset = String(264 - 264 * (est.mid / 100));
   });
 }
 
@@ -775,7 +821,7 @@ async function copyResult(r) {
     `よく見ている → ${parts.map((p) => `${p.name} ${Math.round(p.share * 100)}%`).join(' / ')}`,
     order.map((i) => `${FEATURES[i].name} ${Math.round(faceShares(r)(i) * 100)}%`).join(' / '),
     `髪と肌 ${lookPct}%`,
-    `一貫性 ${Math.round((r.loo ?? r.trainAccuracy) * 100)}%（${r.rounds}回）`,
+    `${r.rounds}問で診断 · 確からしさ ${accRange(r).lo}〜${accRange(r).hi}%`,
   ].join('\n');
   try {
     await navigator.clipboard.writeText(text);
