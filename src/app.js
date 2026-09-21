@@ -2,6 +2,7 @@
 
 import { FEATURES, KEYS, FACE_KEYS, LOOK_KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
+import { buildIdealPrompt, describeIdeal, generateIdeal, PRICE_YEN } from './ideal.js';
 import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain, shouldStop, AUTO_STOP, estimateAccuracy, predict, ACC_FIT } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
@@ -114,10 +115,11 @@ function buildStartScreen() {
       <span class="acc">精度 ${r.acc}%</span></button>`).join('')
     // 回数を決めないモードは種類が違う選択肢なので、数字と同じ列に並べず
     // 下に横幅いっぱいで置く。5つ横並びにすると文字が折り返して読めない。
-    // 平均の精度は固定30問とほぼ同じで、長さが人によって変わる（19〜51問）。
+    // 推定精度が目標に届くまで続ける（src/model.js の AUTO_STOP）。
+    // 問数は人によって変わるので、ボタンには数を出さない。
     + `<button class="choice choice-wide${state.rounds === 'auto' ? ' is-on' : ''}" data-value="auto">
       <span class="big">おまかせ</span>
-      <span class="acc">はっきりするまで · 19〜51問</span></button>`;
+      <span class="acc">はっきりするまで</span></button>`;
 
   // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
   bindChoices($('rounds-choices'), (v) => { state.rounds = v === 'auto' ? 'auto' : Number(v); });
@@ -529,6 +531,67 @@ const usableOf = (r) => (r.usable ? new Set(r.usable) : new Set(KEYS));
  * 2通りで出ていた。分母をそろえると、部位の % は内訳の % の合計になる。
  */
 /**
+ * 「理想の顔を生成」。測った好みから、その場で1枚作る。
+ * プールから選ぶのではないので、その人の理想そのものに近づける。
+ *
+ * 鍵はこのアプリのどこにも置かない。静的サイトなので同梱すると
+ * 誰でも読めてしまう。入力欄に鍵そのものを入れてもらい、
+ * その端末の中だけで使う（src/ideal.js のコメントを参照）。
+ */
+function setupIdeal(r) {
+  const modal = $('ideal-modal');
+  const keyBox = $('ideal-key');
+  const err = $('ideal-error');
+  const status = $('ideal-status');
+  const stage = $('ideal-stage');
+
+  $('t-ideal').innerHTML = `${icon('sparkle')}理想の顔`;
+  $('ideal-price').textContent = `1枚 ${PRICE_YEN}円`;
+  $('btn-ideal').innerHTML = `${icon('play')}<span>理想の顔を生成</span>`;
+  $('ideal-note').textContent = `あなたが見ていた「${describeIdeal(r).join('・')}」から、その場で1枚作ります`;
+
+  const close = () => { modal.hidden = true; err.hidden = true; };
+  $('btn-ideal').onclick = () => {
+    err.hidden = true;
+    modal.hidden = false;
+    // 同じ端末で続けて作るときに打ち直さなくてよいようにする。
+    try { keyBox.value = sessionStorage.getItem(IDEAL_KEY_STORE) ?? ''; } catch { /* 使えない環境は空のまま */ }
+    keyBox.focus();
+  };
+  $('ideal-cancel').onclick = close;
+  modal.onclick = (e) => { if (e.target === modal) close(); };
+  keyBox.onkeydown = (e) => { if (e.key === 'Enter') $('ideal-go').click(); };
+
+  $('ideal-go').onclick = async () => {
+    const key = keyBox.value.trim();
+    if (!key) { err.textContent = 'パスワードを入れてください。'; err.hidden = false; return; }
+    close();
+    try { sessionStorage.setItem(IDEAL_KEY_STORE, key); } catch { /* 保存できなくても動く */ }
+
+    $('btn-ideal').disabled = true;
+    status.hidden = false;
+    stage.hidden = true;
+    status.textContent = '作っています…';
+    try {
+      const src = await generateIdeal(key, buildIdealPrompt(r), {
+        // 失敗しても黙って作り直す。何回目かだけ見せる。
+        onTry: (n) => { status.textContent = n === 1 ? '作っています…' : `作り直しています…（${n}回目）`; },
+      });
+      $('ideal-img').src = src;
+      stage.hidden = false;
+      status.hidden = true;
+      $('btn-ideal').innerHTML = `${icon('replay')}<span>もう1枚作る</span>`;
+    } catch (e) {
+      status.textContent = e.message;
+    } finally {
+      $('btn-ideal').disabled = false;
+    }
+  };
+}
+
+const IDEAL_KEY_STORE = 'facematch.ideal.key';
+
+/**
  * この診断がどれくらい当たるかの見積もり（%の幅）。
  * 推定には6ポイントほどの誤差があるので、点ではなく幅で出す。
  * 見積もり方は src/model.js の estimateAccuracy を参照。
@@ -635,6 +698,8 @@ function renderResult(r) {
 
   $('chosen-strip').innerHTML = r.chosen.filter((id) => srcOf(id))
     .map((id) => `<img src="${srcOf(id)}" alt="" loading="lazy">`).join('');
+
+  setupIdeal(r);
 
   $('btn-again').innerHTML = `${icon('replay')}<span>もう一度</span>`;
   $('btn-again').onclick = () => { buildStartScreen(); show('screen-start'); };
