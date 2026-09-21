@@ -326,7 +326,17 @@ export function estimateAccuracy(rounds, preq) {
  * 平均の精度はほぼ変わらない。変わるのは長さで、好みがはっきりしている人は
  * 19問で終わり、はっきりしない人には51問まで聞く。
  */
-export const AUTO_STOP = { min: 12, max: 80, stable: 3, gap: 0.05, target: 0.85 };
+// 目標と、そのときに実際に出る精度・問数（仮想ユーザー180人での実測）:
+//
+//   目標   上限    問数 中央(10%〜90%)   実際の精度 中央   下位10%
+//   80%    50問      36 (22〜50)          82.0%        67.3%
+//   82%    60問      45 (31〜60)          84.0%        73.0%   ← これを使う
+//   84%    70問      59 (38〜70)          86.8%        73.5%
+//   85%    80問      64 (42〜80)          88.3%        80.0%
+//
+// 掲げた目標と実際はよく合う。上を狙うほど問数が伸びるので、
+// 「しっかり(45問)」と同じくらいの長さに収まる 82% を選んでいる。
+export const AUTO_STOP = { min: 12, max: 60, stable: 3, gap: 0.05, target: 0.82 };
 
 /** 上位3項目の顔ぶれ（並び順は無視）。 */
 const top3Of = (model) => model.keys
@@ -350,9 +360,6 @@ export function shouldStop(model, answered, memo, cfg = AUTO_STOP) {
   if (answered < cfg.min) { memo.prev = null; memo.same = 0; return done(false); }
 
   // 推定精度が目標に届くまで続ける。
-  // ブレの大きい人ほど1問あたりの伸びが小さいので、自然と長くなる
-  // （目標85%で、一貫した人は約29問、平均的な人は約44問、
-  //   ブレの大きい人は約65問）。
   const est = estimateAccuracy(answered, memo.preq);
   if (est < cfg.target) { memo.prev = null; memo.same = 0; return done(false); }
 
