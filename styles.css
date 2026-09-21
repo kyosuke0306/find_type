@@ -138,6 +138,24 @@ code {
 .steps { padding-left: 1.2em; margin: 12px 0 0; font-size: .88rem; }
 .steps li { margin-bottom: 9px; }
 
+/* 背の低い画面では、最初の画面がスクロールなしで収まるようにロゴまわりを詰める。
+   iPhone SE (375x667) で 170px はみ出していた。
+   減らすのはロゴの絵と余白だけで、選択肢とボタンの大きさは変えない。 */
+@media (max-height: 740px) {
+  #screen-start .hero { height: 120px; padding-top: 10px; margin-bottom: -38px; }
+  #screen-start .hero img { height: 70px; }
+  #screen-start .logo { font-size: 1.7rem; }
+  #screen-start .lead { margin-bottom: 10px; font-size: .86rem; }
+  #screen-start .card { padding: 12px; }
+  #screen-start .choices { margin-bottom: 8px; gap: 7px; }
+  /* 回数の選択肢は2段のままで、1つぶんの高さだけ詰める */
+  #screen-start #rounds-choices .choice { padding: 9px 8px; }
+  #screen-start #rounds-choices .choice .big { font-size: 1.15rem; }
+  #screen-start .choice-wide { padding: 8px; }
+  #screen-start .btn { padding: 11px 16px; }
+  #screen-start .btn-ghost { margin-top: 6px; }
+}
+
 /* ---------- 選択チップ ---------- */
 /* 選択肢。狭い画面では1つあたりの幅が足りなくなるので折り返す。
    5つを1行に詰めると1つ62pxまで狭くなり、「さくっ／と」のように
@@ -402,7 +420,11 @@ code {
 }
 .fm-pct { font-size: .8rem; color: var(--accent); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 
-.consistency-card { display: flex; align-items: center; gap: 16px; }
+/* 見出しは上、ゲージと文字は横並び。見出しを横の列に入れると
+   狭い画面で折り返して全体が窮屈になる。 */
+.consistency-card { display: block; }
+.consistency-card .card-title { margin-bottom: 12px; }
+.consistency-body { display: flex; align-items: center; gap: 16px; }
 .gauge { position: relative; width: 88px; height: 88px; flex: none; }
 .gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .gauge circle { fill: none; stroke-width: 9; stroke-linecap: round; }
@@ -414,6 +436,8 @@ code {
 .gauge-num {
   position: absolute; inset: 0; display: grid; place-items: center;
   font-size: 1.25rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums;
+  /* 丸の中は狭い。長い文字列が来ても折り返してはみ出さないようにする。 */
+  white-space: nowrap; line-height: 1;
 }
 .consistency-label { font-weight: 600; margin: 0; font-size: .95rem; }
 
@@ -424,7 +448,7 @@ code {
 @media (max-width: 400px) {
   .track { width: 68px; }
   .pole { font-size: .68rem; }
-  .consistency-card { gap: 12px; }
+  .consistency-body { gap: 12px; }
   .gauge { width: 74px; height: 74px; }
 }
 
@@ -530,8 +554,28 @@ code {
 }
 
 /* ===== 理想の顔 ===== */
-/* 測った好みから、その場で1枚作る。プールから選ぶ他のカードとは別扱い。 */
-.ideal-card { text-align: center; }
+/* 測った好みから、その場で1枚作る。プールから選ぶ他のカードとは別扱い。
+   課金するので、枠と背景をはっきり変えて特別なものだと分かるようにする。 */
+.ideal-card {
+  text-align: center;
+  border: 2px solid var(--accent);
+  background: linear-gradient(160deg, var(--accent-soft), transparent 70%), var(--card);
+}
+/* バッジは普通の要素として置く。浮かせると見出しに重なるか、
+   カードの外に出て上のカードに切られる。 */
+.ideal-badge {
+  display: inline-block; margin: 0 0 10px;
+  padding: 3px 14px; border-radius: 999px;
+  background: var(--accent); color: #fff;
+  font-size: .72rem; font-weight: 700; letter-spacing: .08em;
+  white-space: nowrap;
+}
+.ideal-card .card-title { justify-content: center; }
+.ideal-lead { margin: 10px 0 0; font-size: .92rem; line-height: 1.7; }
+.ideal-price {
+  margin: 8px 0 0; font-size: .8rem; color: var(--ink-dim);
+  font-variant-numeric: tabular-nums;
+}
 .ideal-stage { margin: 12px 0; }
 .ideal-stage img {
   width: 100%; max-width: 280px; aspect-ratio: 1; object-fit: cover;

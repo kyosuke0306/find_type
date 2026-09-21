@@ -458,6 +458,7 @@ function buildSlides(r) {
         : Math.abs(score) >= 0.45 ? 'はっきりと出ています' : 'どちらかといえば、です'}</p>`,
   });
 
+  $('t-accuracy').innerHTML = `${icon('chart')}診断の精度`;
   const est = accRange(r);
   slides.push({
     cls: 'st-consist',
@@ -545,10 +546,14 @@ function setupIdeal(r) {
   const status = $('ideal-status');
   const stage = $('ideal-stage');
 
-  $('t-ideal').innerHTML = `${icon('sparkle')}理想の顔`;
+  $('t-ideal').innerHTML = `${icon('sparkle')}あなただけの理想の顔`;
   $('ideal-price').textContent = `1枚 ${PRICE_YEN}円`;
-  $('btn-ideal').innerHTML = `${icon('play')}<span>理想の顔を生成</span>`;
-  $('ideal-note').textContent = `あなたが見ていた「${describeIdeal(r).join('・')}」から、その場で1枚作ります`;
+  $('ideal-price-note').textContent = `1枚 ${PRICE_YEN}円`;
+  $('btn-ideal').innerHTML = `${icon('sparkle')}<span>理想の顔をつくる</span>`;
+  // 特徴を並べると「条件を満たす顔」に見える。
+  // ここで売りたいのは「自分のためだけに作られた1枚」という感じなので、
+  // 何を見ていたかは他のカードに任せて、ここでは触れない。
+  $('ideal-note').textContent = 'この世界にまだ存在しない、あなたの好みだけでできた顔を、いま作ります。';
 
   const close = () => { modal.hidden = true; err.hidden = true; };
   $('btn-ideal').onclick = () => {
@@ -688,7 +693,10 @@ function renderResult(r) {
   // いちばん自信のないペア」なので、どれだけ答えても70%前後から動かない。
   // 65%と出ても診断が65%しか当たらないという意味ではなかった。
   const est = accRange(r);
-  $('consistency-num').textContent = `${est.lo}–${est.hi}%`;
+  // 丸いゲージの中は3〜4文字しか入らない。幅（60–74%）を入れると
+  // 折り返してはみ出すので、中は真ん中の値だけにして幅は下の行に出す。
+  $('consistency-num').textContent = `${est.mid}%`;
+  $('consistency-note').textContent = `およそ ${est.lo}〜${est.hi}% の確からしさ`;
   // ブレ具合は数字にせず、言葉だけで伝える。
   const loo = Math.round((r.loo ?? r.trainAccuracy) * 100);
   $('consistency-label').textContent = loo >= 78 ? '迷いなく選べています'
