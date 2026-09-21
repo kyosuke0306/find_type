@@ -483,7 +483,7 @@ function buildFillPrompts(targets, n, opts) {
 }
 
 function parseArgs(argv) {
-  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, spread: false, plain: false, decorrelate: null, budgetJpy: null, usdPerImage: 0.045, jpyPerUsd: 160, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
+  const a = { count: 160, out: '.cache/raw', model: 'gemini-3.1-flash-image', imageSize: '0.5K', ethnicity: 'japanese', vibe: 'idol', fill: null, spread: false, plain: false, decorrelate: null, budgetJpy: null, usdPerImage: 0.078, jpyPerUsd: 160, femaleRatio: 0.5, dryRun: false, list: false, concurrency: 3, seed: 12345 };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--count') a.count = Number(argv[++i]);
