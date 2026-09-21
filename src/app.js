@@ -2,7 +2,7 @@
 
 import { FEATURES, KEYS, FACE_KEYS, LOOK_KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
-import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain, shouldStop, AUTO_STOP } from './model.js';
+import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain, shouldStop, AUTO_STOP, estimateAccuracy, predict, ACC_FIT } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
 const $ = (id) => document.getElementById(id);
@@ -32,7 +32,11 @@ const state = {
   stats: newStats(),
   model: null,
   busy: false,
-  autoMemo: {},      // 「はっきりしたら終わり」の判定に使う（src/model.js の shouldStop）
+  autoMemo: {},      // 終了判定に使う（src/model.js の shouldStop）
+  // 出題した時点の予測がどれだけ当たったか。推定精度のもとになる。
+  // 毎回ただで数えられるので、1問ごとに推定を更新できる。
+  preqOk: 0,
+  preqN: 0,
 };
 
 /* ---------------- 起動 ---------------- */
@@ -150,6 +154,8 @@ function startSession() {
   state.model = null;
   state.next = null;
   state.autoMemo = {};
+  state.preqOk = 0;
+  state.preqN = 0;
   show('screen-play');
   nextRound();
 }
@@ -197,6 +203,14 @@ function prepareNext() {
   }
   state.next = decidePair();
   return Promise.all(state.next.map(loadFace));
+}
+
+/** 出題時の予測の的中率を履歴から数え直す。推定精度のもとになる。 */
+function recountPreq() {
+  const hits = state.history.filter((h) => h.hit !== null && h.hit !== undefined);
+  state.preqN = hits.length;
+  state.preqOk = hits.filter((h) => h.hit).length;
+  state.autoMemo.preq = state.preqN > 0 ? state.preqOk / state.preqN : undefined;
 }
 
 function nextRound() {
@@ -265,7 +279,12 @@ function choose(side) {
   cards[1 - side].classList.add('is-dropped');
   state.busy = true;
 
-  state.history.push({ a, b, winner: win.id, skipped: false });
+  // 出題した時点の予測が当たっていたかを記録する（モデルがあるときだけ）。
+  // 戻るで数え直せるよう、履歴に持たせる。
+  const hit = state.model ? (predict(state.model, a.v, b.v) > 0.5) === (side === 0) : null;
+
+  state.history.push({ a, b, winner: win.id, skipped: false, hit });
+  recountPreq();
   updateStats(state.stats, a, b);
   state.round++;
   // 選択が増えるたび再推定し、次のペア選びに反映する
@@ -304,9 +323,10 @@ function undo() {
     else updateStats(state.stats, h.a, h.b);
   }
   state.model = state.history.filter((h) => !h.skipped).length >= 6 ? fit(comparisons()) : null;
-  // 「はっきりしたか」の数えも戻す。戻した回の分を数えたままだと、
+  // 終了判定の数えも戻す。戻した回の分を数えたままだと、
   // 戻ったのに終わってしまう。
   state.autoMemo = {};
+  recountPreq();
   state.next = null;
   state.pair = [last.a, last.b];
   showPair();

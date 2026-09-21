@@ -279,6 +279,39 @@ export function updateStats(stats, A, B, keys = KEYS) {
 // 一致率が1.3ポイント落ちる点。顔を増やしたのに4分の1が一度も出ないのは
 // 本末転倒なので、ここを取っている。
 /**
+ * 推定精度。ランダムな2枚を見せたとき、その人の好みを言い当てられる割合。
+ *
+ * 結果画面に出していた「ブレの少なさ」は、これとは別物だった。
+ * choosePair は「モデルがいちばん自信のないペア」を選んで出題するので、
+ * その正答率は問題を増やしても上がらない（15問で70.8%、90問で68.6%）。
+ * 難しさが実力と釣り合ったまま動くためで、努力とは無関係な数字になる。
+ * 一方こちらは 15問76.3% → 90問89.6% と、ちゃんと上がる。
+ *
+ * 問数と「出題時の予測がどれだけ当たったか」から見積もる。
+ * 仮想ユーザー160人×8時点での最小二乗あてはめ:
+ *
+ *   使う手がかり            推定の誤差
+ *   問数だけ                 7.20pt
+ *   問数＋ブレの少なさ        6.14pt
+ *   問数＋出題時の的中率      6.64pt   ← これを使う
+ *
+ * ブレの少なさ（looAccuracy）のほうがわずかに当たるが、毎回 n 回学習し直す
+ * ので1問ごとには計算できない。出題時の的中率は数えるだけで済み、
+ * 両者の相関は 0.667 ある。
+ *
+ * 誤差が6.6ポイントあるので、点ではなく幅で見せること。
+ */
+export const ACC_FIT = { a: 0.5133, b: 0.0736, c: 0.2948, mae: 0.066 };
+
+/** rounds 問答えて、出題時の的中率が preq のときの推定精度（0.5..0.97）。 */
+export function estimateAccuracy(rounds, preq) {
+  if (!(rounds > 0)) return null;
+  const p = Number.isFinite(preq) ? preq : 0.7;
+  const v = ACC_FIT.a + ACC_FIT.b * Math.log(rounds) + ACC_FIT.c * (p - 0.5);
+  return Math.max(0.5, Math.min(0.97, v));
+}
+
+/**
  * 「傾向がはっきりしたか」の判定。回数を決めずに遊ぶモードで使う。
  *
  * 上位3項目の顔ぶれが STABLE 回続けて変わらず、かつ3位と4位の重視度に
@@ -293,7 +326,7 @@ export function updateStats(stats, A, B, keys = KEYS) {
  * 平均の精度はほぼ変わらない。変わるのは長さで、好みがはっきりしている人は
  * 19問で終わり、はっきりしない人には51問まで聞く。
  */
-export const AUTO_STOP = { min: 12, max: 60, stable: 5, gap: 0.10 };
+export const AUTO_STOP = { min: 12, max: 80, stable: 3, gap: 0.05, target: 0.85 };
 
 /** 上位3項目の顔ぶれ（並び順は無視）。 */
 const top3Of = (model) => model.keys
@@ -315,6 +348,15 @@ export function shouldStop(model, answered, memo, cfg = AUTO_STOP) {
   if (!model) return done(false);
   if (answered >= cfg.max) return done(true);
   if (answered < cfg.min) { memo.prev = null; memo.same = 0; return done(false); }
+
+  // 推定精度が目標に届くまで続ける。
+  // ブレの大きい人ほど1問あたりの伸びが小さいので、自然と長くなる
+  // （目標85%で、一貫した人は約29問、平均的な人は約44問、
+  //   ブレの大きい人は約65問）。
+  const est = estimateAccuracy(answered, memo.preq);
+  if (est < cfg.target) { memo.prev = null; memo.same = 0; return done(false); }
+
+  // 届いていても、上位3項目がまだ入れ替わっているなら続ける。
   const now = top3Of(model);
   memo.same = (now === memo.prev) ? (memo.same ?? 0) + 1 : 0;
   memo.prev = now;
