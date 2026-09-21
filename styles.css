@@ -528,3 +528,38 @@ code {
   .story-hint { animation: none; }
   .st-bar b, .st-track b { transition: none; }
 }
+
+/* ===== 理想の顔 ===== */
+/* 測った好みから、その場で1枚作る。プールから選ぶ他のカードとは別扱い。 */
+.ideal-card { text-align: center; }
+.ideal-stage { margin: 12px 0; }
+.ideal-stage img {
+  width: 100%; max-width: 280px; aspect-ratio: 1; object-fit: cover;
+  border-radius: 16px; display: block; margin: 0 auto;
+}
+.ideal-status { margin: 12px 0; color: var(--ink-dim); font-size: .9rem; }
+.ideal-card .btn { margin-top: 12px; }
+
+/* 生成前の確認。鍵を打たせるので、誤って押しただけでは進まないようにする。 */
+.modal {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(0, 0, 0, .55);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.modal[hidden] { display: none !important; }
+.modal-box {
+  background: var(--card); border-radius: 18px; padding: 22px;
+  width: 100%; max-width: 340px; box-shadow: 0 20px 50px -12px rgba(0,0,0,.5);
+}
+.modal-box h2 { margin: 0 0 6px; font-size: 1.1rem; }
+.modal-price { margin: 0 0 14px; color: var(--accent); font-weight: 700; }
+.modal-note { margin: 0 0 10px; color: var(--ink-dim); font-size: .85rem; }
+.modal-box input {
+  width: 100%; padding: 11px 12px; font: inherit;
+  border: 2px solid var(--line); border-radius: 12px;
+  background: transparent; color: var(--ink);
+}
+.modal-box input:focus { outline: none; border-color: var(--accent); }
+.modal-error { margin: 10px 0 0; color: #e0574f; font-size: .85rem; }
+.modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+.modal-actions .btn { flex: 1 1 0; margin: 0; }
