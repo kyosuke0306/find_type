@@ -114,10 +114,11 @@ function buildStartScreen() {
       <span class="acc">精度 ${r.acc}%</span></button>`).join('')
     // 回数を決めないモードは種類が違う選択肢なので、数字と同じ列に並べず
     // 下に横幅いっぱいで置く。5つ横並びにすると文字が折り返して読めない。
-    // 平均の精度は固定30問とほぼ同じで、長さが人によって変わる（19〜51問）。
+    // 推定精度が目標に届くまで続ける（src/model.js の AUTO_STOP）。
+    // 問数は人によって変わるので、ボタンには数を出さない。
     + `<button class="choice choice-wide${state.rounds === 'auto' ? ' is-on' : ''}" data-value="auto">
       <span class="big">おまかせ</span>
-      <span class="acc">はっきりするまで · 19〜51問</span></button>`;
+      <span class="acc">はっきりするまで</span></button>`;
 
   // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
   bindChoices($('rounds-choices'), (v) => { state.rounds = v === 'auto' ? 'auto' : Number(v); });
