@@ -420,7 +420,11 @@ code {
 }
 .fm-pct { font-size: .8rem; color: var(--accent); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 
-.consistency-card { display: flex; align-items: center; gap: 16px; }
+/* 見出しは上、ゲージと文字は横並び。見出しを横の列に入れると
+   狭い画面で折り返して全体が窮屈になる。 */
+.consistency-card { display: block; }
+.consistency-card .card-title { margin-bottom: 12px; }
+.consistency-body { display: flex; align-items: center; gap: 16px; }
 .gauge { position: relative; width: 88px; height: 88px; flex: none; }
 .gauge svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .gauge circle { fill: none; stroke-width: 9; stroke-linecap: round; }
@@ -444,7 +448,7 @@ code {
 @media (max-width: 400px) {
   .track { width: 68px; }
   .pole { font-size: .68rem; }
-  .consistency-card { gap: 12px; }
+  .consistency-body { gap: 12px; }
   .gauge { width: 74px; height: 74px; }
 }
 
@@ -556,12 +560,16 @@ code {
   text-align: center; position: relative;
   border: 2px solid var(--accent);
   background: linear-gradient(160deg, var(--accent-soft), transparent 70%), var(--card);
+  /* バッジを枠の中に置く。外に出すと上のカードと重なって切れる。 */
+  padding-top: 26px;
+  margin-top: 8px;
 }
 .ideal-badge {
-  position: absolute; top: -11px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
   margin: 0; padding: 3px 14px; border-radius: 999px;
   background: var(--accent); color: #fff;
   font-size: .72rem; font-weight: 700; letter-spacing: .08em;
+  white-space: nowrap;
 }
 .ideal-card .card-title { justify-content: center; }
 .ideal-lead { margin: 10px 0 0; font-size: .92rem; line-height: 1.7; }

@@ -135,16 +135,18 @@
 
     <div class="card reveal consistency-card" style="--i:5">
       <h2 class="card-title" id="t-accuracy"></h2>
-      <div class="gauge">
-        <svg viewBox="0 0 100 100" aria-hidden="true">
-          <circle class="gauge-track" cx="50" cy="50" r="42"/>
-          <circle class="gauge-fill" id="gauge-fill" cx="50" cy="50" r="42"/>
-        </svg>
-        <span class="gauge-num" id="consistency-num">0%</span>
-      </div>
-      <div>
-        <p class="consistency-label" id="consistency-label">—</p>
-        <p class="card-note" id="consistency-note">この診断の精度（推定）</p>
+      <div class="consistency-body">
+        <div class="gauge">
+          <svg viewBox="0 0 100 100" aria-hidden="true">
+            <circle class="gauge-track" cx="50" cy="50" r="42"/>
+            <circle class="gauge-fill" id="gauge-fill" cx="50" cy="50" r="42"/>
+          </svg>
+          <span class="gauge-num" id="consistency-num">0%</span>
+        </div>
+        <div>
+          <p class="consistency-label" id="consistency-label">—</p>
+          <p class="card-note" id="consistency-note"></p>
+        </div>
       </div>
     </div>
 
