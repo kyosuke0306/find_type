@@ -557,16 +557,15 @@ code {
 /* 測った好みから、その場で1枚作る。プールから選ぶ他のカードとは別扱い。
    課金するので、枠と背景をはっきり変えて特別なものだと分かるようにする。 */
 .ideal-card {
-  text-align: center; position: relative;
+  text-align: center;
   border: 2px solid var(--accent);
   background: linear-gradient(160deg, var(--accent-soft), transparent 70%), var(--card);
-  /* バッジを枠の中に置く。外に出すと上のカードと重なって切れる。 */
-  padding-top: 26px;
-  margin-top: 8px;
 }
+/* バッジは普通の要素として置く。浮かせると見出しに重なるか、
+   カードの外に出て上のカードに切られる。 */
 .ideal-badge {
-  position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
-  margin: 0; padding: 3px 14px; border-radius: 999px;
+  display: inline-block; margin: 0 0 10px;
+  padding: 3px 14px; border-radius: 999px;
   background: var(--accent); color: #fff;
   font-size: .72rem; font-weight: 700; letter-spacing: .08em;
   white-space: nowrap;
