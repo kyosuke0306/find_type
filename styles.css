@@ -414,6 +414,8 @@ code {
 .gauge-num {
   position: absolute; inset: 0; display: grid; place-items: center;
   font-size: 1.25rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums;
+  /* 丸の中は狭い。長い文字列が来ても折り返してはみ出さないようにする。 */
+  white-space: nowrap; line-height: 1;
 }
 .consistency-label { font-weight: 600; margin: 0; font-size: .95rem; }
 
