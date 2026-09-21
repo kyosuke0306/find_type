@@ -113,7 +113,7 @@ function buildStartScreen() {
     // 平均の精度は固定30問とほぼ同じで、長さが人によって変わる（19〜51問）。
     + `<button class="choice choice-wide${state.rounds === 'auto' ? ' is-on' : ''}" data-value="auto">
       <span class="big">おまかせ</span>
-      <span class="acc">傾向がはっきりしたら終わり（19〜51問）</span></button>`;
+      <span class="acc">はっきりするまで · 19〜51問</span></button>`;
 
   // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
   bindChoices($('rounds-choices'), (v) => { state.rounds = v === 'auto' ? 'auto' : Number(v); });

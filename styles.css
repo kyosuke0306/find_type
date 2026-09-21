@@ -139,8 +139,9 @@ code {
 .steps li { margin-bottom: 9px; }
 
 /* ---------- 選択チップ ---------- */
-/* 選択肢。折り返せるようにしておき、横幅いっぱいのものは次の行に落とす。
-   5つを1行に詰めると、1つあたりが狭くなって文字が折り返してしまう。 */
+/* 選択肢。狭い画面では1つあたりの幅が足りなくなるので折り返す。
+   5つを1行に詰めると1つ62pxまで狭くなり、「さくっ／と」のように
+   文字が折り返して読めなかった。 */
 .choices { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .choice {
   flex: 1 1 0; min-width: 0; padding: 12px 6px;
@@ -158,13 +159,24 @@ code {
 .choice.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .choice.is-on .icon { animation: pop .35s cubic-bezier(.2,1.4,.4,1); }
 
-/* 横幅いっぱいの選択肢（回数を決めないモードなど）。中身は横並びにする。 */
+/* 横幅いっぱいの選択肢（回数を決めないモードなど）。
+   横並びにすると、狭い画面で見出しと説明の両方が折り返してしまうので縦に積む。 */
 .choice-wide {
-  flex: 0 0 100%; flex-direction: row; justify-content: center;
-  align-items: baseline; gap: 10px; padding: 11px 12px;
+  flex: 0 0 100%; flex-direction: column; align-items: center;
+  gap: 2px; padding: 12px;
 }
-.choice-wide .big { font-size: 1.05rem; }
-.choice-wide .acc { font-size: .72rem; }
+.choice-wide .big { font-size: 1.1rem; }
+.choice-wide .acc { font-size: .72rem; white-space: nowrap; }
+
+/* 狭い画面では回数の選択肢を2つずつ2段に置く。
+   1段に4つ並べると1つ74pxで、指で押すには窮屈だった。 */
+@media (max-width: 460px) {
+  .choices { gap: 10px; }
+  #rounds-choices .choice { flex: 1 1 calc(50% - 5px); padding: 14px 8px; }
+  #rounds-choices .choice .sub { font-size: .76rem; }
+  #rounds-choices .choice .acc { font-size: .72rem; }
+  .choice-wide { flex: 0 0 100%; }
+}
 
 @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
