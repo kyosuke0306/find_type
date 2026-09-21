@@ -139,7 +139,9 @@ code {
 .steps li { margin-bottom: 9px; }
 
 /* ---------- 選択チップ ---------- */
-.choices { display: flex; gap: 8px; margin-bottom: 12px; }
+/* 選択肢。折り返せるようにしておき、横幅いっぱいのものは次の行に落とす。
+   5つを1行に詰めると、1つあたりが狭くなって文字が折り返してしまう。 */
+.choices { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
 .choice {
   flex: 1 1 0; min-width: 0; padding: 12px 6px;
   border: 2px solid var(--line); background: transparent; color: var(--ink-dim);
@@ -155,6 +157,15 @@ code {
 .choice:hover { border-color: var(--accent); transform: translateY(-2px); }
 .choice.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .choice.is-on .icon { animation: pop .35s cubic-bezier(.2,1.4,.4,1); }
+
+/* 横幅いっぱいの選択肢（回数を決めないモードなど）。中身は横並びにする。 */
+.choice-wide {
+  flex: 0 0 100%; flex-direction: row; justify-content: center;
+  align-items: baseline; gap: 10px; padding: 11px 12px;
+}
+.choice-wide .big { font-size: 1.05rem; }
+.choice-wide .acc { font-size: .72rem; }
+
 @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
 .btn {

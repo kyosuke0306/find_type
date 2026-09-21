@@ -105,12 +105,15 @@ function buildStartScreen() {
     { v: 30, label: 'おすすめ', acc: 82 },
     { v: 45, label: 'しっかり', acc: 85 },
     { v: 90, label: 'とことん', acc: 89 },
-    // 回数を決めず、傾向がはっきりしたら終わるモード。
-    // 平均の精度は固定30問とほぼ同じで、長さが人によって変わる（19〜51問）。
-    { v: 'auto', label: 'おまかせ', acc: 83, sub: 'はっきりするまで' },
   ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
-      <span class="big">${r.v === 'auto' ? '？' : r.v}</span><span class="sub">${r.label}</span>
-      <span class="acc">${r.sub ? r.sub : `精度 ${r.acc}%`}</span></button>`).join('');
+      <span class="big">${r.v}</span><span class="sub">${r.label}</span>
+      <span class="acc">精度 ${r.acc}%</span></button>`).join('')
+    // 回数を決めないモードは種類が違う選択肢なので、数字と同じ列に並べず
+    // 下に横幅いっぱいで置く。5つ横並びにすると文字が折り返して読めない。
+    // 平均の精度は固定30問とほぼ同じで、長さが人によって変わる（19〜51問）。
+    + `<button class="choice choice-wide${state.rounds === 'auto' ? ' is-on' : ''}" data-value="auto">
+      <span class="big">おまかせ</span>
+      <span class="acc">傾向がはっきりしたら終わり（19〜51問）</span></button>`;
 
   // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
   bindChoices($('rounds-choices'), (v) => { state.rounds = v === 'auto' ? 'auto' : Number(v); });
