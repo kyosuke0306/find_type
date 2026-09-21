@@ -102,27 +102,38 @@ function buildStartScreen() {
      </button>`).join('');
   if (options.length >= 2) bindChoices(genderBox, (v) => { state.gender = v; });
 
-  $('rounds-choices').innerHTML = [
-    // 同梱プールでの実測値。npm run acc-check で確かめられる。
-    // 顔・較正・ペアの選び方・測る項目のどれかを変えると動くので、
-    // 公開する前に必ず確かめること（CLAUDE.md を参照）。
+  // 問数の選択。数字だけを1行に並べ、選んだものの説明は下に1行で出す。
+  // 1つずつに説明と精度を書くと1つあたりが狭くなり、5つ並べると
+  // 文字が折り返す。2段にすると今度は縦に伸びて最初の画面に収まらない。
+  //
+  // 精度は同梱プールでの実測値。npm run acc-check で確かめられる。
+  // 顔・較正・ペアの選び方・測る項目のどれかを変えると動くので、
+  // 公開する前に必ず確かめること（CLAUDE.md を参照）。
+  const ROUNDS = [
     { v: 20, label: 'さくっと', acc: 79 },
     { v: 30, label: 'おすすめ', acc: 82 },
     { v: 45, label: 'しっかり', acc: 85 },
     { v: 90, label: 'とことん', acc: 89 },
-  ].map((r) => `<button class="choice${r.v === state.rounds ? ' is-on' : ''}" data-value="${r.v}">
-      <span class="big">${r.v}</span><span class="sub">${r.label}</span>
-      <span class="acc">精度 ${r.acc}%</span></button>`).join('')
-    // 回数を決めないモードは種類が違う選択肢なので、数字と同じ列に並べず
-    // 下に横幅いっぱいで置く。5つ横並びにすると文字が折り返して読めない。
-    // 推定精度が目標に届くまで続ける（src/model.js の AUTO_STOP）。
-    // 問数は人によって変わるので、ボタンには数を出さない。
-    + `<button class="choice choice-wide${state.rounds === 'auto' ? ' is-on' : ''}" data-value="auto">
-      <span class="big">おまかせ</span>
-      <span class="acc">はっきりするまで</span></button>`;
+    // 回数を決めず、推定精度が目標に届くまで続ける（src/model.js の AUTO_STOP）。
+    // 問数は人によって変わるので数は出さない。
+    { v: 'auto', label: 'おまかせ', note: 'はっきりするまで' },
+  ];
+  const roundNote = (v) => {
+    const r = ROUNDS.find((x) => String(x.v) === String(v)) ?? ROUNDS[1];
+    return r.note ? `<b>${r.label}</b> ・ ${r.note}`
+      : `<b>${r.label}</b> ・ 精度 ${r.acc}%`;
+  };
+  $('rounds-choices').innerHTML = ROUNDS.map((r) =>
+    `<button class="choice choice-num${String(r.v) === String(state.rounds) ? ' is-on' : ''}" data-value="${r.v}"
+       aria-label="${r.v === 'auto' ? 'おまかせ' : r.v + '問'}">
+      <span class="big">${r.v === 'auto' ? '？' : r.v}</span></button>`).join('');
+  $('rounds-note').innerHTML = roundNote(state.rounds);
 
   // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
-  bindChoices($('rounds-choices'), (v) => { state.rounds = v === 'auto' ? 'auto' : Number(v); });
+  bindChoices($('rounds-choices'), (v) => {
+    state.rounds = v === 'auto' ? 'auto' : Number(v);
+    $('rounds-note').innerHTML = roundNote(v);
+  });
 
   $('btn-start').innerHTML = `${icon('play')}<span>はじめる</span>`;
   $('btn-start').onclick = startSession;

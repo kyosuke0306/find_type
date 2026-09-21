@@ -159,24 +159,20 @@ code {
 .choice.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .choice.is-on .icon { animation: pop .35s cubic-bezier(.2,1.4,.4,1); }
 
-/* 横幅いっぱいの選択肢（回数を決めないモードなど）。
-   横並びにすると、狭い画面で見出しと説明の両方が折り返してしまうので縦に積む。 */
-.choice-wide {
-  flex: 0 0 100%; flex-direction: column; align-items: center;
-  gap: 2px; padding: 12px;
+/* 問数の選択。数字だけを1行に並べる。
+   1つずつに説明と精度を書くと狭くて文字が折り返し、2段にすると
+   縦に伸びて最初の画面に収まらない。説明は下に1行だけ出す。 */
+.choices-num { gap: 6px; margin-bottom: 8px; flex-wrap: nowrap; }
+.choice-num {
+  flex: 1 1 0; min-width: 0; padding: 13px 0;
+  align-items: center; justify-content: center; gap: 0;
 }
-.choice-wide .big { font-size: 1.1rem; }
-.choice-wide .acc { font-size: .72rem; white-space: nowrap; }
-
-/* 狭い画面では回数の選択肢を2つずつ2段に置く。
-   1段に4つ並べると1つ74pxで、指で押すには窮屈だった。 */
-@media (max-width: 460px) {
-  .choices { gap: 10px; }
-  #rounds-choices .choice { flex: 1 1 calc(50% - 5px); padding: 14px 8px; }
-  #rounds-choices .choice .sub { font-size: .76rem; }
-  #rounds-choices .choice .acc { font-size: .72rem; }
-  .choice-wide { flex: 0 0 100%; }
+.choice-num .big { font-size: 1.15rem; }
+.rounds-note {
+  margin: 0 0 14px; text-align: center;
+  font-size: .85rem; color: var(--ink-dim);
 }
+.rounds-note b { color: var(--ink); font-weight: 700; }
 
 @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
