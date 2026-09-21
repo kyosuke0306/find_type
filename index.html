@@ -147,6 +147,17 @@
       </div>
     </div>
 
+    <!-- 測った好みから、その場で理想の顔を作る。プールから選ぶのではない。 -->
+    <div class="card reveal ideal-card" style="--i:6">
+      <h2 class="card-title" id="t-ideal"></h2>
+      <p class="card-note" id="ideal-note">あなたの好みから、世界に1枚だけの顔をその場で作ります</p>
+      <div class="ideal-stage" id="ideal-stage" hidden>
+        <img id="ideal-img" alt="あなたの理想の顔">
+      </div>
+      <p class="ideal-status" id="ideal-status" hidden></p>
+      <button id="btn-ideal" class="btn btn-primary btn-block btn-icon"></button>
+    </div>
+
     <div class="actions">
       <button id="btn-copy" class="btn btn-primary btn-block btn-icon"></button>
       <button id="btn-again" class="btn btn-ghost btn-block btn-icon"></button>
@@ -154,6 +165,22 @@
   </section>
 
 </main>
+
+<!-- 理想の顔を作る前の確認。鍵は端末の外に出さない（src/ideal.js のコメント参照）。 -->
+<div class="modal" id="ideal-modal" hidden>
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="ideal-modal-title">
+    <h2 id="ideal-modal-title">理想の顔を生成</h2>
+    <p class="modal-price" id="ideal-price"></p>
+    <p class="modal-note">生成にはパスワードが必要です。</p>
+    <input id="ideal-key" type="password" autocomplete="off" placeholder="パスワード" aria-label="パスワード">
+    <p class="modal-error" id="ideal-error" hidden></p>
+    <div class="modal-actions">
+      <button id="ideal-cancel" class="btn btn-ghost">やめる</button>
+      <button id="ideal-go" class="btn btn-primary">作る</button>
+    </div>
+  </div>
+</div>
+
 <script type="module" src="src/app.js"></script>
 </body>
 </html>
