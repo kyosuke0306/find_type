@@ -173,6 +173,15 @@ code {
   font-size: .85rem; color: var(--ink-dim);
 }
 .rounds-note b { color: var(--ink); font-weight: 700; }
+/* 「はじめる」ボタンを置かず、選んだものをもう一度押すと始まる。
+   押せば始まると分からないと動けないので、必ず見えるようにする。 */
+.rounds-go {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  margin-top: 6px; color: var(--accent); font-weight: 700; font-size: .92rem;
+}
+.rounds-go .icon { width: 1em; height: 1em; }
+/* 選ばれているものは、押せば始まると分かるように強めに見せる */
+.choice-num.is-on { box-shadow: 0 4px 14px -4px var(--accent); }
 
 @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
