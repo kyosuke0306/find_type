@@ -33,6 +33,11 @@ const AXES = {
         '21 years old', '21 years old', '22 years old', '24 years old', '25 years old'],
 };
 
+// --ethnicity を --decorrelate / --spread / --fill / --plain でも効かせるための取り出し口。
+// 以前はこれらの経路が 'Japanese woman' を直書きしていて、--ethnicity が黙って無視されていた。
+// 同じ人種ばかり作っていると生成器の顔が出尽くすので、前提を変える手として要る。
+const ethBagOf = (opts, rand) => makeBag(ETHNICITY[opts.ethnicity] ?? ETHNICITY.japanese, rand);
+
 const ETHNICITY = {
   japanese: ['Japanese'],
   eastasian: ['Japanese', 'Korean', 'Chinese'],
@@ -193,6 +198,7 @@ const ARCHETYPES = [
  */
 function buildPlainPrompts(n, opts) {
   const rand = mulberry(opts.seed);
+  const ethBag = ethBagOf(opts, rand);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
   const axes = resolveAxes(opts);
   const hairBag = makeBag(axes.hair, rand);
@@ -201,7 +207,7 @@ function buildPlainPrompts(n, opts) {
   const out = [];
   for (let i = 0; i < n; i++) {
     // 髪と年齢だけ振る。生成器はこの2つなら素直に従うし、顔も崩れない。
-    const variation = `Japanese woman, ${ageBag()}, ${hairBag()}, ${colorBag()}`;
+    const variation = `${ethBag()} woman, ${ageBag()}, ${hairBag()}, ${colorBag()}`;
     out.push({
       index: i, gender: 'woman', why: 'かわいさ最優先（顔の指定なし）',
       variation,
@@ -226,6 +232,7 @@ function buildPlainPrompts(n, opts) {
  */
 function buildDecorrelatePrompts(faces, n, opts) {
   const rand = mulberry(opts.seed);
+  const ethBag = ethBagOf(opts, rand);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
   const axes = resolveAxes(opts);
   const hairBag = makeBag(axes.hair, rand);
@@ -288,7 +295,7 @@ function buildDecorrelatePrompts(faces, n, opts) {
     // FILL_PHRASES は冠詞まで含めて正しい形になっているので、そのまま並べる。
     // 年齢は ageLook の指定と重なるので、そちらが対象のときは足さない。
     const age = (t.a === 'ageLook' || t.b === 'ageLook') ? null : ageBag();
-    const variation = [`Japanese woman`, age, pa, pb, hairBag(), colorBag()]
+    const variation = [`${ethBag()} woman`, age, pa, pb, hairBag(), colorBag()]
       .filter(Boolean).join(', ');
     out.push({
       index: i, gender: 'woman',
@@ -316,6 +323,7 @@ const jaSide = (k, hi) => (hi ? FEATURES[KEYS.indexOf(k)].high : FEATURES[KEYS.i
  */
 function buildSpreadPrompts(n, opts) {
   const rand = mulberry(opts.seed);
+  const ethBag = ethBagOf(opts, rand);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
   const axes = resolveAxes(opts);
   const hairBag = makeBag(axes.hair, rand);
@@ -333,7 +341,7 @@ function buildSpreadPrompts(n, opts) {
   for (let i = 0; i < n; i++) {
     const a = book[i % book.length];
     // 同じ型でも髪と年齢は変える。型が2周目に入っても別人になるように。
-    const variation = `Japanese woman, ${ageBag()}, ${a.en}, ${hairBag()}, ${colorBag()}`
+    const variation = `${ethBag()} woman, ${ageBag()}, ${a.en}, ${hairBag()}, ${colorBag()}`
       + ', still a strikingly pretty and cute face';
     out.push({
       index: i, gender: 'woman', why: `顔の型: ${a.ja}`,
@@ -438,6 +446,7 @@ const HAIR_PHRASES = {
 
 function buildFillPrompts(targets, n, opts) {
   const rand = mulberry(opts.seed);
+  const ethBag = ethBagOf(opts, rand);
   const vibe = VIBE[opts.vibe] ?? VIBE.idol;
   const axes = resolveAxes(opts);
   const out = [];
@@ -474,7 +483,7 @@ function buildFillPrompts(targets, n, opts) {
     // 前置きごと外す（--vibe neutral）と端は作れるが、顔の水準が
     // 既存のプールから外れて、かわいさの層に混ぜられなくなる。
     const tail = opts.soft ? '' : ', still a strikingly pretty and cute face';
-    const variation = `Japanese woman, ${age}, ${phrases.join(', ')}${tail}`;
+    const variation = `${ethBag()} woman, ${age}, ${phrases.join(', ')}${tail}`;
     out.push({
       index: i, gender: 'woman', why: tgt.why,
       variation,
