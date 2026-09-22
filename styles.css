@@ -9,6 +9,8 @@
   --line: #dde3ee;
   --accent: #3b5b98;
   --accent-soft: #e5ecf8;
+  /* 枚数カードが脈打つときの色。--accent-soft を一段濃くしたもの */
+  --accent-lift: #cfdff7;
   --accent-2: #7d9ad6;
   --heart: #ec5f8e;
   --danger: #e11d48;
@@ -26,6 +28,7 @@
     --line: #2f3542;
     --accent: #7f9fe0;
     --accent-soft: #222d47;
+    --accent-lift: #33456d;
     --accent-2: #4f6cb0;
     --heart: #f47da8;
     --danger: #fb4a6d;
@@ -248,15 +251,18 @@ code {
 
 /* 出ているカードが選択なので、押せば始まる。それを脈打ちで伝える。
    ずっと動かすと落ち着かないので、1周期のうち動くのは後半だけにして間を空ける。
-   1回ふくらむだけでは気づかれなかったので、心臓のように二度打たせ、
-   浮き上がりと影も一緒に動かして分かるようにした。
-   変えるのは大きさと影と浮きだけなので、周りの配置は動かない。 */
+   心臓のように二度打たせ、浮き上がりと色も一緒に動かして分かるようにした。
+
+   影（外に広がる box-shadow）は使わない。.rounds-view が overflow:hidden で
+   切り抜いているため、広がった影がその枠で四角く切り落とされ、角が
+   とがって見えてしまう。枠を広げると隣のカードが覗くので、逃げ場がない。
+   代わりに、カードの内側で完結する「大きさ・浮き・背景色」で伝える。 */
 @keyframes numPulse {
-  0%, 48%, 100% { transform: translateY(0) scale(1);        box-shadow: 0 4px 14px -4px var(--accent); }
-  58%           { transform: translateY(-3px) scale(1.06);  box-shadow: 0 13px 30px -6px var(--accent); }
-  68%           { transform: translateY(0) scale(1.005);    box-shadow: 0 5px 16px -4px var(--accent); }
-  78%           { transform: translateY(-2px) scale(1.045); box-shadow: 0 10px 24px -6px var(--accent); }
-  88%           { transform: translateY(0) scale(1);        box-shadow: 0 4px 14px -4px var(--accent); }
+  0%, 48%, 100% { transform: translateY(0) scale(1);        background-color: var(--accent-soft); }
+  58%           { transform: translateY(-3px) scale(1.06);  background-color: var(--accent-lift); }
+  68%           { transform: translateY(0) scale(1.005);    background-color: var(--accent-soft); }
+  78%           { transform: translateY(-2px) scale(1.045); background-color: var(--accent-lift); }
+  88%           { transform: translateY(0) scale(1);        background-color: var(--accent-soft); }
 }
 
 @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
