@@ -68,7 +68,8 @@ npm run gap-check -- .cache/decor/faces.json
 1. **かわいさの基準は人が決める** — 生成した顔は必ず本人に見せて、採否をもらう。
    アイドル・女優くらいのかわいさが基準（[目的](#目的)の2つめ）。18〜25歳
 2. **足す前に測る** — `gap-check` で枠を埋めるか、`npm test` で精度が下がらないかを見る。
-   **精度が下がるなら足さない**。ただし数枚の差は前後を別々に平均しても見えません
+   **精度が下がるなら足さない**。ただし数枚の差は前後を別々に平均しても見えないので、
+   `npm run ab-check` で比べる
    （[数枚の採否は、600人でも見えません](#数枚の採否は600人でも見えません対応のある比較で測ってください)）
 3. **相関を強める顔は足さない** — 枠を埋めない顔は、足しても偏りは直らない
 4. **APIキーはチャットに貼らせない** — 環境変数か、クラウド環境の API credentials で渡す
@@ -1093,8 +1094,15 @@ npm run generate -- --decorrelate --pair noseWidth,mouthWidth \
 ユーザーごとの差を取れば**、共通のばらつきが消えて必要な人数が減ります。
 
 `npm test` の既定（60人）と `--pool` なしの合成プールでは、
-**プールの数枚の入れ替えは測れません。** 必ず `--pool data/faces.json` を付け、
-人数を増やし、差のばらつきまで見てください。
+**プールの数枚の入れ替えは測れません。** この比べ方は `npm run ab-check` にしてあります。
+
+```bash
+git show HEAD:data/faces.json > .cache/faces-before.json   # 変える前を取り出す
+npm run ab-check -- .cache/faces-before.json data/faces.json 1200
+```
+
+`±` は2標準誤差です。**これをまたいでいるものは誤差の範囲**なので、
+符号を見て「上がった」「下がった」と言ってはいけません。
 
 #### 231枚・しきい値 0.22 で、生成器は打ち止めになりました
 
@@ -1463,6 +1471,7 @@ tools/trim-check.mjs 狙いから外れた顔を、精度が足りていれば�
 tools/feature-report.mjs 項目ごとの出やすさ・当てやすさ・確からしさ
 tools/calibrate.mjs 出やすさをそろえる係数を求める
 tools/acc-check.mjs 画面に出す精度（20/30/45/90問）の実測
+tools/ab-check.mjs  2つのプールを同じ仮想ユーザーに解かせて比べる（対応のある比較）
 tools/make-icon.mjs / tools/make-mark.mjs  アプリアイコンとマークの生成
 tools/serve.mjs     依存ゼロの静的サーバー
 test/simulate.mjs   仮想ユーザーによる推定精度の検証

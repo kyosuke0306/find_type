@@ -112,16 +112,21 @@ function evaluate(pool, user, model, rand, attr) {
 export function benchmark({ faces = null, rounds = 30, trials = 60, adaptive = true, attr = 0 } = {}) {
   const real = faces ? normalizePool(faces).map((f) => ({ id: f.file, v: f.v, tier: f.tier, hair: f.hair })) : null;
   const agg = { acc: 0, hit: 0, hit5: 0, merr: 0 };
+  // 乱数はユーザーごとに固定（mulberry(1000 + t)）なので、別のプールを同じ人数で
+  // 測れば同じ人が両方を解いたことになる。その差を取れば共通のばらつきが消えるので、
+  // 1人ずつの結果も返す（tools/ab-check.mjs が使う）。
+  const per = [];
   for (let t = 0; t < trials; t++) {
     const rand = mulberry(1000 + t);
     const pool = real ?? makePool(160, rand);
     const user = makeUser(rand);
     const model = runSession(pool, user, rounds, rand, adaptive, attr);
     const e = evaluate(pool, user, model, rand, attr);
+    per.push(e);
     for (const k in agg) agg[k] += e[k];
   }
   for (const k in agg) agg[k] /= trials;
-  return { ...agg, size: real ? real.length : 160 };
+  return { ...agg, per, size: real ? real.length : 160 };
 }
 
 // 直接実行されたときだけ結果を表示する（他から import しても走らないように）
