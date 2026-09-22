@@ -139,13 +139,13 @@ function buildStartScreen() {
     // 問数は人によって変わるので数は出さない。
     { v: 'auto', label: 'おまかせ', note: 'はっきりするまで' },
   ];
+  // 「はじめる」ボタンは置かず、選んだものをもう一度押すと始まる。
+  // 押し方の案内は出さない。選ばれているものだけ影を強くしてあるので、
+  // そこが押せることは見て分かる（styles.css の .choice-num.is-on）。
   const roundNote = (v) => {
     const r = ROUNDS.find((x) => String(x.v) === String(v)) ?? ROUNDS[1];
-    const head = r.note ? `<b>${r.label}</b> ・ ${r.note}`
+    return r.note ? `<b>${r.label}</b> ・ ${r.note}`
       : `<b>${r.label}</b> ・ 精度 ${r.acc}%`;
-    // 「はじめる」ボタンは置かず、選んだものをもう一度押すと始まる。
-    // 押せば始まると分からないと動けないので、必ず添える。
-    return `${head}<span class="rounds-go">${icon('play')}タップしてはじめる</span>`;
   };
   $('rounds-choices').innerHTML = ROUNDS.map((r) =>
     `<button class="choice choice-num${String(r.v) === String(state.rounds) ? ' is-on' : ''}" data-value="${r.v}"
