@@ -297,8 +297,10 @@ function buildDecorrelatePrompts(faces, n, opts) {
       // かわいさを押すと、生成器は「かわいい顔の正解値」から離れられず、
       // 狙った象限の片側（小鼻がしっかり×小さめの口、など）が作れない。
       // --vibe neutral のときは押さえの一文ごと外して、実測値の側を優先する。
+      // --soft は前置きのかわいさだけ残して、末尾の念押しを外す中間。
+      // 端の顔24枚（tier: edge）はこの設定で作れたので、--fill と同じように効かせる。
       text: vibe
-        ? `A ${FRAMING}. A ${vibe} ${variation}, still a strikingly pretty and cute face.`
+        ? `A ${FRAMING}. A ${vibe} ${variation}${opts.soft ? '' : ', still a strikingly pretty and cute face'}.`
         : `A ${FRAMING}. A ${variation}.`,
     });
   }
