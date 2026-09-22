@@ -77,6 +77,83 @@ async function init() {
   show('screen-start');
 }
 
+/**
+ * 問数の選択（横に送る形）。
+ *
+ * 出ているものがそのまま選択。押せば始まる。送るのは矢印・スワイプ・矢印キー。
+ * 指で送っている間は transform を指に追従させ、離したところで近いほうへ収める。
+ * スワイプと押し間違えないよう、動いた距離が小さいときだけ「押した」とみなす。
+ */
+function setupRounds(ROUNDS) {
+  const box = $('rounds');
+  const track = $('rounds-track');
+  const view = $('rounds-view');
+  let at = Math.max(0, ROUNDS.findIndex((r) => String(r.v) === String(state.rounds)));
+
+  const apply = (animate = true) => {
+    track.style.transition = animate ? '' : 'none';
+    track.style.transform = `translateX(${-at * 100}%)`;
+    $('rounds-prev').disabled = at === 0;
+    $('rounds-next').disabled = at === ROUNDS.length - 1;
+    [...$('rounds-dots').children].forEach((d, i) => d.classList.toggle('is-on', i === at));
+    // 画面の外にあるカードは、タブでも読み上げでも触れないようにする。
+    [...track.children].forEach((slide, i) => {
+      const c = slide.firstElementChild;
+      c.tabIndex = i === at ? 0 : -1;
+      slide.setAttribute('aria-hidden', i === at ? 'false' : 'true');
+    });
+    // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
+    const v = ROUNDS[at].v;
+    state.rounds = v === 'auto' ? 'auto' : Number(v);
+  };
+  const go = (d) => { at = Math.min(ROUNDS.length - 1, Math.max(0, at + d)); apply(); };
+  apply(false);
+
+  $('rounds-prev').onclick = () => go(-1);
+  $('rounds-next').onclick = () => go(1);
+
+  // 指で送る。pointer ならマウスでもタッチでも同じ扱いになる。
+  let startX = 0, dx = 0, dragging = false;
+  const width = () => view.getBoundingClientRect().width || 1;
+  view.addEventListener('pointerdown', (e) => {
+    dragging = true; startX = e.clientX; dx = 0;
+    box.classList.add('is-dragging');
+    track.style.transition = 'none';
+    view.setPointerCapture?.(e.pointerId);
+  });
+  view.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    dx = e.clientX - startX;
+    // 端では引っぱっても戻る量を減らして、これ以上無いことを手で伝える。
+    const over = (at === 0 && dx > 0) || (at === ROUNDS.length - 1 && dx < 0);
+    track.style.transform = `translateX(${-at * 100 + (dx / width()) * 100 * (over ? 0.3 : 1)}%)`;
+  });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    box.classList.remove('is-dragging');
+    track.style.transition = '';
+    // 幅の2割か60pxのどちらか小さいほうを越えたら送る。
+    if (Math.abs(dx) > Math.min(60, width() * 0.2)) go(dx < 0 ? 1 : -1);
+    else apply();
+  };
+  view.addEventListener('pointerup', end);
+  view.addEventListener('pointercancel', end);
+
+  // キーボードでも送れるようにする。カードはボタンなので Enter で始まる。
+  document.addEventListener('keydown', (e) => {
+    if (!$('screen-start') || $('screen-start').hidden) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
+  });
+
+  // 押したら始まる。
+  // 受けるのは view。setPointerCapture を使うと click の相手が view に
+  // 付け替えられるので、カード側に付けても届かない。
+  // スワイプの終わりにも click が飛ぶため、動いていたら始めない。
+  view.onclick = () => { if (Math.abs(dx) <= 6) startSession(); };
+}
+
 function showSetupNeeded(reason) {
   $('setup-reason').textContent = reason;
   show('screen-setup-needed');
@@ -139,33 +216,23 @@ function buildStartScreen() {
     // 問数は人によって変わるので数は出さない。
     { v: 'auto', label: 'おまかせ', note: 'はっきりするまで' },
   ];
-  // 「はじめる」ボタンは置かず、選んだものをもう一度押すと始まる。
-  // 押し方の案内は出さない。選ばれているものだけ影を強くしてあるので、
-  // そこが押せることは見て分かる（styles.css の .choice-num.is-on）。
-  const roundNote = (v) => {
-    const r = ROUNDS.find((x) => String(x.v) === String(v)) ?? ROUNDS[1];
-    return r.note ? `<b>${r.label}</b> ・ ${r.note}`
-      : `<b>${r.label}</b> ・ 精度 ${r.acc}%`;
-  };
-  $('rounds-choices').innerHTML = ROUNDS.map((r) =>
-    `<button class="choice choice-num${String(r.v) === String(state.rounds) ? ' is-on' : ''}" data-value="${r.v}"
-       aria-label="${r.v === 'auto' ? 'おまかせ' : r.v + '問'}">
-      <span class="big">${r.v === 'auto' ? '？' : r.v}</span></button>`).join('');
-  $('rounds-note').innerHTML = roundNote(state.rounds);
-
-  // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
-  // すでに選ばれているものをもう一度押したら始める。
-  // 初めて押したときは選ぶだけ（説明が入れ替わる）。
-  $('rounds-choices').onclick = (e) => {
-    const b = e.target.closest('.choice');
-    if (!b) return;
-    if (b.classList.contains('is-on')) { startSession(); return; }
-    $('rounds-choices').querySelectorAll('.choice').forEach((c) => c.classList.remove('is-on'));
-    b.classList.add('is-on');
-    const v = b.dataset.value;
-    state.rounds = v === 'auto' ? 'auto' : Number(v);
-    $('rounds-note').innerHTML = roundNote(v);
-  };
+  // 1枚ずつ大きく見せ、左右のボタンかスワイプで送る。
+  // 出ているものがそのまま選択なので、「はじめる」ボタンは要らない。押せば始まる。
+  // 1枚ぶんの枠（rounds-slide）の内側にカードを置く。カードが枠いっぱいだと、
+  // 脈打ちで膨らんだぶんが隣にはみ出して、隣のカードの縁が覗いてしまう。
+  $('rounds-track').innerHTML = ROUNDS.map((r) => `
+    <div class="rounds-slide">
+      <button class="rounds-card" data-value="${r.v}"
+        aria-label="${r.v === 'auto' ? 'おまかせ' : r.v + '問'}ではじめる">
+        <span class="rounds-num">${r.v === 'auto' ? '？' : r.v}</span>
+        <span class="rounds-label">${r.label}</span>
+        <span class="rounds-sub">${r.note ?? `精度 ${r.acc}%`}</span>
+      </button>
+    </div>`).join('');
+  $('rounds-dots').innerHTML = ROUNDS.map(() => '<i></i>').join('');
+  $('rounds-prev').innerHTML = icon('caretLeft');
+  $('rounds-next').innerHTML = icon('caretRight');
+  setupRounds(ROUNDS);
 
 
   const last = localStorage.getItem(STORE_KEY);

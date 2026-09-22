@@ -45,8 +45,16 @@
 
     <div class="card">
       <div class="choices" id="gender-choices" role="radiogroup" aria-label="診断する顔"></div>
-      <div class="choices choices-num" id="rounds-choices" role="radiogroup" aria-label="回数"></div>
-      <p class="rounds-note" id="rounds-note"></p>
+      <!-- 問数の選択。1つずつ大きく見せ、左右のボタンかスワイプで選ぶ。
+           出ているものがそのまま選択なので、押すと始まる。 -->
+      <div class="rounds" id="rounds">
+        <button class="rounds-arrow" id="rounds-prev" aria-label="前の回数"></button>
+        <div class="rounds-view" id="rounds-view">
+          <div class="rounds-track" id="rounds-track"></div>
+        </div>
+        <button class="rounds-arrow" id="rounds-next" aria-label="次の回数"></button>
+      </div>
+      <div class="rounds-dots" id="rounds-dots" aria-hidden="true"></div>
       <button id="btn-last-result" class="btn btn-ghost btn-block btn-icon" hidden></button>
     </div>
   </section>

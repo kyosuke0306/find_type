@@ -175,45 +175,80 @@ code {
 .choice.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .choice.is-on .icon { animation: pop .35s cubic-bezier(.2,1.4,.4,1); }
 
-/* 問数の選択。数字だけを1行に並べる。
-   1つずつに説明と精度を書くと狭くて文字が折り返し、2段にすると
-   縦に伸びて最初の画面に収まらない。説明は下に1行だけ出す。 */
-.choices-num { gap: 6px; margin-bottom: 10px; flex-wrap: nowrap; }
-/* 5つを1行に収めるので横幅は画面まかせ。押しやすさと読みやすさは
-   高さと数字の大きさで出す。 */
-.choice-num {
-  flex: 1 1 0; min-width: 0; padding: 18px 0;
-  align-items: center; justify-content: center; gap: 0;
+/* 問数の選択。1つずつ大きく見せ、左右のボタンかスワイプで送る。
+   5つを1行に詰めると1つ 45〜59px しか取れず、説明も精度も入らなかった。
+   1枚ずつなら、数字・呼び名・精度をまとめて読める。 */
+.rounds { display: flex; align-items: center; gap: 4px; }
+.rounds-view { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+.rounds-track {
+  display: flex;
+  transition: transform .32s cubic-bezier(.2,.8,.2,1);
+  /* 指で送っている間は追従させたいので、JS 側で transition を切る */
 }
-.choice-num .big { font-size: 1.45rem; }
-/* 背の低い画面では、大きくしたぶんスタート画面が1画面に収まらなくなる
-   （320x568 で 16px あふれた）。そこだけ元の大きさに戻す。 */
-@media (max-height: 620px) {
-  .choice-num { padding: 13px 0; }
-  .choice-num .big { font-size: 1.15rem; }
+/* 1枚ぶんの枠。内側に余白を取って、脈打ちで膨らんでも隣に触れないようにする。 */
+.rounds-slide { flex: 0 0 100%; min-width: 0; padding: 6px; }
+.rounds-card {
+  width: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  padding: 14px 8px;
+  /* 送るたびに高さが変わると下が揺れるので、いちばん高いものに合わせて固定する。 */
+  min-height: 124px;
+  border: 2px solid var(--accent); border-radius: 16px;
+  background: var(--accent-soft); color: var(--accent);
+  font: inherit; cursor: pointer;
+  /* 横方向のスワイプを拾うため、縦スクロールだけブラウザに任せる */
+  touch-action: pan-y;
+  -webkit-user-select: none; user-select: none;
 }
-.rounds-note {
-  margin: 0 0 14px; text-align: center;
-  font-size: .85rem; color: var(--ink-dim);
-}
-.rounds-note b { color: var(--ink); font-weight: 700; }
-/* 「はじめる」ボタンは置かず、選んだものをもう一度押すと始まる。
-   「タップしてはじめる」の文字を外したので、押せることは見た目で伝える。
-   選ばれているものを軽く脈打たせて、指を誘う。
+.rounds-num { font-size: 2.3rem; font-weight: 800; line-height: 1.05; }
+.rounds-label { font-size: .95rem; font-weight: 700; color: var(--ink); }
+.rounds-sub { font-size: .8rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+/* 出ているものが選択なので、押せば始まる。脈打ちでそれを伝える。 */
+.rounds-card { animation: numPulse 2.4s ease-in-out infinite; }
+.rounds-view:hover .rounds-card, .rounds.is-dragging .rounds-card { animation: none; }
 
-   ずっと動かすと落ち着かないので、1周期のうち動くのは後半だけにして
-   間を空ける。変えるのは大きさと影だけなので、周りの配置は動かない。 */
-.choice-num.is-on {
-  box-shadow: 0 4px 14px -4px var(--accent);
-  animation: numPulse 2.4s ease-in-out infinite;
+.rounds-arrow {
+  flex: none; width: 34px; height: 34px; padding: 0;
+  border: 2px solid var(--line); border-radius: 50%;
+  background: transparent; color: var(--accent); cursor: pointer;
+  display: grid; place-items: center;
+  transition: border-color .15s, opacity .15s;
 }
+.rounds-arrow:hover:not(:disabled) { border-color: var(--accent); }
+.rounds-arrow:disabled { opacity: .3; cursor: default; }
+.rounds-arrow .icon { width: 18px; height: 18px; }
+
+.rounds-dots { display: flex; justify-content: center; gap: 6px; margin: 8px 0 12px; }
+.rounds-dots i {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--line); transition: background .2s, transform .2s;
+}
+.rounds-dots i.is-on { background: var(--accent); transform: scale(1.35); }
+
+/* 背の低い画面では、そのままだとスタート画面が1画面に収まらない
+   （320x568 で 40px あふれた）。カードを詰める。 */
+@media (max-height: 620px) {
+  /* 下の余白も詰める。#screen-start の min-height は
+     「100svh - #app の上下 padding」なので、そちらも合わせて直す。 */
+  #app { padding-bottom: 40px; }
+  #screen-start { min-height: calc(100svh - 60px); }
+  /* 絵も抑える。ここを詰めないと 320x568 で1画面に収まらない。 */
+  #screen-start .hero { max-height: 38svh; }
+  #screen-start .hero img { height: clamp(110px, 26svh, 180px); }
+  .rounds-card { min-height: 92px; padding: 9px 8px; }
+  .rounds-num { font-size: 1.85rem; }
+  .rounds-label { font-size: .88rem; }
+  .rounds-sub { font-size: .74rem; }
+  .rounds-dots { margin: 6px 0 10px; }
+}
+
+/* 出ているカードが選択なので、押せば始まる。それを脈打ちで伝える。
+   ずっと動かすと落ち着かないので、1周期のうち動くのは後半だけにして間を空ける。
+   変えるのは大きさと影だけなので、周りの配置は動かない。 */
 @keyframes numPulse {
   0%, 62%, 100% { transform: scale(1); box-shadow: 0 4px 14px -4px var(--accent); }
   80% { transform: scale(1.045); box-shadow: 0 7px 22px -4px var(--accent); }
 }
-/* 指を載せた時点で気づいているので、脈打ちは止めて .choice:hover の
-   浮き上がりに譲る。animation が transform を握ったままだと hover が効かない。 */
-.choice-num.is-on:hover { animation: none; }
 
 @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
