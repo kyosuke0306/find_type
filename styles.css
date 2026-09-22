@@ -178,12 +178,20 @@ code {
 /* 問数の選択。数字だけを1行に並べる。
    1つずつに説明と精度を書くと狭くて文字が折り返し、2段にすると
    縦に伸びて最初の画面に収まらない。説明は下に1行だけ出す。 */
-.choices-num { gap: 6px; margin-bottom: 8px; flex-wrap: nowrap; }
+.choices-num { gap: 6px; margin-bottom: 10px; flex-wrap: nowrap; }
+/* 5つを1行に収めるので横幅は画面まかせ。押しやすさと読みやすさは
+   高さと数字の大きさで出す。 */
 .choice-num {
-  flex: 1 1 0; min-width: 0; padding: 13px 0;
+  flex: 1 1 0; min-width: 0; padding: 18px 0;
   align-items: center; justify-content: center; gap: 0;
 }
-.choice-num .big { font-size: 1.15rem; }
+.choice-num .big { font-size: 1.45rem; }
+/* 背の低い画面では、大きくしたぶんスタート画面が1画面に収まらなくなる
+   （320x568 で 16px あふれた）。そこだけ元の大きさに戻す。 */
+@media (max-height: 620px) {
+  .choice-num { padding: 13px 0; }
+  .choice-num .big { font-size: 1.15rem; }
+}
 .rounds-note {
   margin: 0 0 14px; text-align: center;
   font-size: .85rem; color: var(--ink-dim);
@@ -663,4 +671,4 @@ code {
 }
 /* 横向きなど高さの無い画面では、内容の上に重なって読みにくい。
    デプロイの確認は縦向きでできるので、そこでは出さない。 */
-@media (max-height: 450px) { .version { display: none; } }
+@media (max-height: 520px) { .version { display: none; } }
