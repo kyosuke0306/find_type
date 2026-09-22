@@ -26,11 +26,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Jekyll の処理を無効化する
         run: touch .nojekyll
+      # 時刻は日本時間。見るのが日本にいる人なので、UTC だと9時間ずれて
+      # 「さっきのデプロイか」の判断に使えない。
       - name: 版を書き出す（画面の隅に出して、反映されたかを確かめる）
         run: |
           printf '{"rev":"%s","builtAt":"%s"}\n' \
             "$(git rev-parse --short HEAD)" \
-            "$(date -u '+%m/%d %H:%M')" > version.json
+            "$(TZ=Asia/Tokyo date '+%m/%d %H:%M')" > version.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

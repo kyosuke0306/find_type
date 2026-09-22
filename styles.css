@@ -80,6 +80,22 @@ code {
 @keyframes bounce { 0%,100% { transform: translateY(0); opacity: .35; } 50% { transform: translateY(-9px); opacity: 1; } }
 
 /* ---------- スタート ---------- */
+/* 縦長の画面では、カードの下に画面の3〜4割が余っていた。内容が496px固定で
+   画面の高さに追従していなかったため。画面いっぱいに伸ばして、余りを
+   「ロゴの絵」と「カードの上」に配る。絵が大きくなって、カードは親指の
+   届く下側に寄る。短い画面（iPhone SE など）では伸びしろが無いので今までどおり。 */
+#screen-start {
+  min-height: calc(100svh - 76px);   /* #app の上下 padding 20+56 を引く */
+  display: flex; flex-direction: column;
+}
+/* 余った高さは、まず絵が受け取る。上限を付けて伸びすぎを止める。 */
+#screen-start .hero { flex: 1 1 auto; max-height: 52svh; }
+#screen-start .hero img { height: clamp(132px, 32svh, 250px); }
+/* 残りはカードの上に入れて、カードを下へ寄せる。
+   絵が上限に当たったぶんはここに出るので、開きすぎないよう上限を付ける。 */
+#screen-start .card { margin-top: auto; }
+#screen-start .lead { margin-bottom: min(18px, 4svh); }
+
 /* アイコンを貼るのではなく、地色をページの背景として上部に溶け込ませる。
    左右は負マージンで #app の余白を打ち消し、下は透明へ落として境目をなくす。
    透明側の RGB を地色と同じにしておくと、途中でくすまずに消える。 */
@@ -620,3 +636,6 @@ code {
   pointer-events: none;
   user-select: none;
 }
+/* 横向きなど高さの無い画面では、内容の上に重なって読みにくい。
+   デプロイの確認は縦向きでできるので、そこでは出さない。 */
+@media (max-height: 450px) { .version { display: none; } }
