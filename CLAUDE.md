@@ -103,9 +103,15 @@ npm run generate -- --decorrelate --pair noseWidth,mouthWidth \
 「まだ作れること」のほう**だと思って使う。
 
 **数枚の採否を、前後を別々に平均して決めないこと。** 4枚の差は600人でも見えず、
-`npm test -- 30 600 --pool` では「悪化」と出た（実際は誤差）。同じ仮想ユーザーに
-両方のプールを解かせる対応のある比較で、1200人取ること。README の
-「数枚の採否は、600人でも見えません」に数字がある。
+`node test/simulate.mjs 30 600 --pool` では「悪化」と出た（実際は誤差）。
+同じ仮想ユーザーに両方のプールを解かせる `npm run ab-check` を1200人で使う。
+
+```bash
+git show HEAD:data/faces.json > .cache/faces-before.json
+npm run ab-check -- .cache/faces-before.json data/faces.json 1200
+```
+
+`±` は2標準誤差。**またいでいるものは誤差の範囲**なので、符号だけを見ない。
 
 判断の順番は、重複 → かわいさ → 効果。
 
