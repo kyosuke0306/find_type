@@ -179,21 +179,24 @@ code {
    5つを1行に詰めると1つ 45〜59px しか取れず、説明も精度も入らなかった。
    1枚ずつなら、数字・呼び名・精度をまとめて読める。 */
 .rounds { display: flex; align-items: center; gap: 4px; }
-.rounds-view { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+/* 角を丸くしておく。ここは overflow:hidden で切り抜く枠なので、
+   直角のままだと送っている途中のカードが角だけ四角く切り落とされる。 */
+.rounds-view { flex: 1 1 auto; min-width: 0; overflow: hidden; border-radius: 24px; }
 .rounds-track {
   display: flex;
   transition: transform .32s cubic-bezier(.2,.8,.2,1);
   /* 指で送っている間は追従させたいので、JS 側で transition を切る */
 }
-/* 1枚ぶんの枠。内側に余白を取って、脈打ちで膨らんでも隣に触れないようにする。 */
-.rounds-slide { flex: 0 0 100%; min-width: 0; padding: 6px; }
+/* 1枚ぶんの枠。内側に余白を取って、脈打ちで膨らんでも隣に触れないようにする。
+   横は膨らみ幅（幅の3%）＋浮き上がりぶんを見て、縦横で別に取る。 */
+.rounds-slide { flex: 0 0 100%; min-width: 0; padding: 8px 10px; }
 .rounds-card {
   width: 100%;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   padding: 14px 8px;
   /* 送るたびに高さが変わると下が揺れるので、いちばん高いものに合わせて固定する。 */
   min-height: 124px;
-  border: 2px solid var(--accent); border-radius: 16px;
+  border: 2px solid var(--accent); border-radius: 22px;
   background: var(--accent-soft); color: var(--accent);
   font: inherit; cursor: pointer;
   /* 横方向のスワイプを拾うため、縦スクロールだけブラウザに任せる */
@@ -204,7 +207,7 @@ code {
 .rounds-label { font-size: .95rem; font-weight: 700; color: var(--ink); }
 .rounds-sub { font-size: .8rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
 /* 出ているものが選択なので、押せば始まる。脈打ちでそれを伝える。 */
-.rounds-card { animation: numPulse 2.4s ease-in-out infinite; }
+.rounds-card { animation: numPulse 2s ease-in-out infinite; }
 .rounds-view:hover .rounds-card, .rounds.is-dragging .rounds-card { animation: none; }
 
 .rounds-arrow {
@@ -235,6 +238,7 @@ code {
   /* 絵も抑える。ここを詰めないと 320x568 で1画面に収まらない。 */
   #screen-start .hero { max-height: 38svh; }
   #screen-start .hero img { height: clamp(110px, 26svh, 180px); }
+  .rounds-slide { padding: 6px 10px; }
   .rounds-card { min-height: 92px; padding: 9px 8px; }
   .rounds-num { font-size: 1.85rem; }
   .rounds-label { font-size: .88rem; }
@@ -244,10 +248,15 @@ code {
 
 /* 出ているカードが選択なので、押せば始まる。それを脈打ちで伝える。
    ずっと動かすと落ち着かないので、1周期のうち動くのは後半だけにして間を空ける。
-   変えるのは大きさと影だけなので、周りの配置は動かない。 */
+   1回ふくらむだけでは気づかれなかったので、心臓のように二度打たせ、
+   浮き上がりと影も一緒に動かして分かるようにした。
+   変えるのは大きさと影と浮きだけなので、周りの配置は動かない。 */
 @keyframes numPulse {
-  0%, 62%, 100% { transform: scale(1); box-shadow: 0 4px 14px -4px var(--accent); }
-  80% { transform: scale(1.045); box-shadow: 0 7px 22px -4px var(--accent); }
+  0%, 48%, 100% { transform: translateY(0) scale(1);        box-shadow: 0 4px 14px -4px var(--accent); }
+  58%           { transform: translateY(-3px) scale(1.06);  box-shadow: 0 13px 30px -6px var(--accent); }
+  68%           { transform: translateY(0) scale(1.005);    box-shadow: 0 5px 16px -4px var(--accent); }
+  78%           { transform: translateY(-2px) scale(1.045); box-shadow: 0 10px 24px -6px var(--accent); }
+  88%           { transform: translateY(0) scale(1);        box-shadow: 0 4px 14px -4px var(--accent); }
 }
 
 @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
