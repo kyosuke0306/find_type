@@ -181,10 +181,14 @@ code {
 /* 問数の選択。1つずつ大きく見せ、左右のボタンかスワイプで送る。
    5つを1行に詰めると1つ 45〜59px しか取れず、説明も精度も入らなかった。
    1枚ずつなら、数字・呼び名・精度をまとめて読める。 */
-.rounds { display: flex; align-items: center; gap: 4px; }
-/* 角を丸くしておく。ここは overflow:hidden で切り抜く枠なので、
-   直角のままだと送っている途中のカードが角だけ四角く切り落とされる。 */
-.rounds-view { flex: 1 1 auto; min-width: 0; overflow: hidden; border-radius: 24px; }
+/* --slide は1枚ぶんの幅（view に対する％）。100 より小さくすると
+   その差ぶんだけ隣のカードが左右に覗く。狭い画面では覗きを減らして
+   真ん中のカードの文字が潰れないようにする。 */
+.rounds { display: flex; align-items: center; gap: 4px; --slide: 70; }
+/* ここは overflow:hidden で切り抜く枠。覗いているカードはこの縁で
+   まっすぐ切れるが、薄く敷いてあるので「続きがある」ほうに読める。
+   枠を丸めると、覗きが細いぶん上下が削られて木の葉形になってしまう。 */
+.rounds-view { flex: 1 1 auto; min-width: 0; overflow: hidden; }
 .rounds-track {
   display: flex;
   transition: transform .32s cubic-bezier(.2,.8,.2,1);
@@ -192,7 +196,12 @@ code {
 }
 /* 1枚ぶんの枠。内側に余白を取って、脈打ちで膨らんでも隣に触れないようにする。
    横は膨らみ幅（幅の3%）＋浮き上がりぶんを見て、縦横で別に取る。 */
-.rounds-slide { flex: 0 0 100%; min-width: 0; padding: 8px 10px; }
+.rounds-slide {
+  flex: 0 0 calc(var(--slide) * 1%); min-width: 0; padding: 8px;
+  /* 覗いているほうは薄くして、真ん中が選択だと分かるようにする */
+  opacity: .45; transition: opacity .32s cubic-bezier(.2,.8,.2,1);
+}
+.rounds-slide.is-on { opacity: 1; }
 .rounds-card {
   width: 100%;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
@@ -207,10 +216,15 @@ code {
   -webkit-user-select: none; user-select: none;
 }
 .rounds-num { font-size: 2.3rem; font-weight: 800; line-height: 1.05; }
-.rounds-label { font-size: .95rem; font-weight: 700; color: var(--ink); }
-.rounds-sub { font-size: .8rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+/* 折り返させない。カードが細くなったとき2行になると、その1枚だけ背が伸びて
+   列ごと高くなり、背の低い画面で1画面に収まらなくなる。 */
+.rounds-label { font-size: .95rem; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.rounds-sub {
+  font-size: .8rem; color: var(--ink-dim); font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 /* 出ているものが選択なので、押せば始まる。脈打ちでそれを伝える。 */
-.rounds-card { animation: numPulse 2s ease-in-out infinite; }
+.rounds-slide.is-on .rounds-card { animation: numPulse 2s ease-in-out infinite; }
 .rounds-view:hover .rounds-card, .rounds.is-dragging .rounds-card { animation: none; }
 
 .rounds-arrow {
@@ -241,12 +255,21 @@ code {
   /* 絵も抑える。ここを詰めないと 320x568 で1画面に収まらない。 */
   #screen-start .hero { max-height: 38svh; }
   #screen-start .hero img { height: clamp(110px, 26svh, 180px); }
-  .rounds-slide { padding: 6px 10px; }
+  .rounds-slide { padding: 6px 8px; }
   .rounds-card { min-height: 92px; padding: 9px 8px; }
   .rounds-num { font-size: 1.85rem; }
   .rounds-label { font-size: .88rem; }
   .rounds-sub { font-size: .74rem; }
   .rounds-dots { margin: 6px 0 10px; }
+}
+
+/* かなり横が狭いときだけ、覗かせたぶん真ん中が窮屈になるので覗きを減らす。
+   375px（iPhone SE）は減らさない。ここで減らすと 390px より中央が
+   大きくなって、画面幅と逆に動いてしまう。 */
+@media (max-width: 340px) {
+  .rounds { --slide: 74; }
+  /* 「はっきりするまで」がいちばん長く、そのままだと余白にはみ出す */
+  .rounds-sub { font-size: .68rem; }
 }
 
 /* 出ているカードが選択なので、押せば始まる。それを脈打ちで伝える。

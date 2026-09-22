@@ -90,9 +90,14 @@ function setupRounds(ROUNDS) {
   const view = $('rounds-view');
   let at = Math.max(0, ROUNDS.findIndex((r) => String(r.v) === String(state.rounds)));
 
+  // 1枚ぶんの幅は CSS の --slide（view に対する％）で決める。100 未満なら
+  // 余った左右に隣が覗くので、そのぶん真ん中へ寄せ直す必要がある。
+  const slideW = () => Number(getComputedStyle(box).getPropertyValue('--slide')) || 100;
+  const restOf = (i) => { const w = slideW(); return -i * w + (100 - w) / 2; };
+
   const apply = (animate = true) => {
     track.style.transition = animate ? '' : 'none';
-    track.style.transform = `translateX(${-at * 100}%)`;
+    track.style.transform = `translateX(${restOf(at)}%)`;
     $('rounds-prev').disabled = at === 0;
     $('rounds-next').disabled = at === ROUNDS.length - 1;
     [...$('rounds-dots').children].forEach((d, i) => d.classList.toggle('is-on', i === at));
@@ -101,6 +106,7 @@ function setupRounds(ROUNDS) {
       const c = slide.firstElementChild;
       c.tabIndex = i === at ? 0 : -1;
       slide.setAttribute('aria-hidden', i === at ? 'false' : 'true');
+      slide.classList.toggle('is-on', i === at);
     });
     // 'auto' は数に直さない。回数を決めないモードの目印として文字のまま持つ。
     const v = ROUNDS[at].v;
@@ -113,9 +119,13 @@ function setupRounds(ROUNDS) {
   $('rounds-next').onclick = () => go(1);
 
   // 指で送る。pointer ならマウスでもタッチでも同じ扱いになる。
-  let startX = 0, dx = 0, dragging = false;
+  let startX = 0, dx = 0, dragging = false, downAt = null;
   const width = () => view.getBoundingClientRect().width || 1;
   view.addEventListener('pointerdown', (e) => {
+    // どの枚数を押したかは、ここで覚えておく。setPointerCapture のあとは
+    // click の相手が view に付け替えられて、押した先が分からなくなる。
+    const slide = e.target.closest?.('.rounds-slide');
+    downAt = slide ? [...track.children].indexOf(slide) : null;
     dragging = true; startX = e.clientX; dx = 0;
     box.classList.add('is-dragging');
     track.style.transition = 'none';
@@ -126,7 +136,7 @@ function setupRounds(ROUNDS) {
     dx = e.clientX - startX;
     // 端では引っぱっても戻る量を減らして、これ以上無いことを手で伝える。
     const over = (at === 0 && dx > 0) || (at === ROUNDS.length - 1 && dx < 0);
-    track.style.transform = `translateX(${-at * 100 + (dx / width()) * 100 * (over ? 0.3 : 1)}%)`;
+    track.style.transform = `translateX(${restOf(at) + (dx / width()) * 100 * (over ? 0.3 : 1)}%)`;
   });
   const end = () => {
     if (!dragging) return;
@@ -147,11 +157,20 @@ function setupRounds(ROUNDS) {
     else if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
   });
 
-  // 押したら始まる。
+  // 押したら始まる。ただし覗いている隣を押したときは、そちらへ送るだけ。
+  // 覗きは「選べるものが他にもある」という合図なので、押して別の枚数で
+  // 始まってしまうと押し間違いになる。
   // 受けるのは view。setPointerCapture を使うと click の相手が view に
   // 付け替えられるので、カード側に付けても届かない。
   // スワイプの終わりにも click が飛ぶため、動いていたら始めない。
-  view.onclick = () => { if (Math.abs(dx) <= 6) startSession(); };
+  view.onclick = () => {
+    const pressed = downAt;
+    downAt = null;
+    if (Math.abs(dx) > 6) return;
+    // キーボードの Enter には pointerdown が無いので、そのときは真ん中扱い。
+    if (pressed != null && pressed !== at) go(pressed - at);
+    else startSession();
+  };
 }
 
 function showSetupNeeded(reason) {
