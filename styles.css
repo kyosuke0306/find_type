@@ -593,6 +593,31 @@ code {
   border-radius: 16px; display: block; margin: 0 auto;
 }
 .ideal-status { margin: 12px 0; color: var(--ink-dim); font-size: .9rem; }
+/* カードの中の1枚は、押すと全画面で開く目印として指の形にする。 */
+.ideal-stage img { cursor: zoom-in; }
+
+/* 理想の顔を画面いっぱいで見せるビューア。
+   モーダル(50)より上、iPhone のノッチとホームバーを避ける。 */
+.viewer {
+  position: fixed; inset: 0; z-index: 55;
+  background: rgba(8, 11, 18, .94);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px
+           calc(16px + env(safe-area-inset-bottom, 0px));
+}
+.viewer[hidden] { display: none !important; }
+/* 縦にも横にも収める。正方形の顔なので、短いほうの辺で決まる。 */
+.viewer img {
+  max-width: 100%; max-height: calc(100svh - 150px);
+  width: auto; height: auto; object-fit: contain;
+  border-radius: 14px; display: block;
+}
+.viewer-bar { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.viewer-bar .btn { min-width: 132px; justify-content: center; }
+/* 暗い地の上なので、ghost の文字色を地に合わせて上書きする。 */
+.viewer-bar .btn-ghost { color: #e9edf5; border-color: rgba(233, 237, 245, .45); }
+.viewer-hint { margin: 0; font-size: .76rem; color: rgba(233, 237, 245, .6); text-align: center; }
 .ideal-card .btn { margin-top: 12px; }
 
 /* 生成前の確認。鍵を打たせるので、誤って押しただけでは進まないようにする。 */

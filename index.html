@@ -187,6 +187,17 @@
   </div>
 </div>
 
+<!-- 生成した理想の顔を画面いっぱいで見せる。保存もここから。
+     カードの中では280pxしかなく、300円かけて作った1枚には小さすぎた。 -->
+<div class="viewer" id="ideal-viewer" hidden>
+  <img id="ideal-full" alt="あなただけの理想の顔">
+  <div class="viewer-bar">
+    <a id="ideal-save" class="btn btn-primary btn-icon" download="facematch-ideal.jpg"></a>
+    <button id="ideal-close" class="btn btn-ghost btn-icon"></button>
+  </div>
+  <p class="viewer-hint">保存できないときは、画像を長押ししてください。</p>
+</div>
+
 <!-- デプロイが反映されたかを画面の隅で確かめるための版表示。
      中身は GitHub Actions が version.json に書き出す（.github/workflows/pages.yml）。 -->
 <p class="version" id="version" aria-hidden="true"></p>

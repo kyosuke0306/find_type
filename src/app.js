@@ -587,6 +587,9 @@ function setupIdeal(r) {
   const status = $('ideal-status');
   const stage = $('ideal-stage');
 
+  const viewer = $('ideal-viewer');
+  const saveLink = $('ideal-save');
+
   $('t-ideal').innerHTML = `${icon('sparkle')}あなただけの理想の顔`;
   $('ideal-price').textContent = `1枚 ${PRICE_YEN}円`;
   $('ideal-price-note').textContent = `1枚 ${PRICE_YEN}円`;
@@ -606,6 +609,14 @@ function setupIdeal(r) {
   };
   $('ideal-cancel').onclick = close;
   modal.onclick = (e) => { if (e.target === modal) close(); };
+
+  // ビューア。作った直後に開くほか、カードの1枚を押しても開く。
+  saveLink.innerHTML = `${icon('download')}<span>保存</span>`;
+  $('ideal-close').innerHTML = `${icon('close')}<span>閉じる</span>`;
+  const closeViewer = () => { viewer.hidden = true; };
+  $('ideal-close').onclick = closeViewer;
+  viewer.onclick = (e) => { if (e.target === viewer) closeViewer(); };
+  $('ideal-img').onclick = () => { if ($('ideal-img').src) showIdeal($('ideal-img').src); };
   keyBox.onkeydown = (e) => { if (e.key === 'Enter') $('ideal-go').click(); };
 
   $('ideal-go').onclick = async () => {
@@ -627,12 +638,38 @@ function setupIdeal(r) {
       stage.hidden = false;
       status.hidden = true;
       $('btn-ideal').innerHTML = `${icon('replay')}<span>もう1枚作る</span>`;
+      // 300円かけて作った1枚なので、まず画面いっぱいで見せる。
+      showIdeal(src);
     } catch (e) {
       status.textContent = e.message;
     } finally {
       $('btn-ideal').disabled = false;
     }
   };
+}
+
+/**
+ * 生成した1枚を画面いっぱいで見せる。保存もここから。
+ *
+ * 保存は data: URL のままだと端末によっては落とせないので、
+ * Blob に直してから渡す。それでも落とせない端末（iOS の一部）が
+ * あるので、画面に「長押しでも保存できる」と添えてある。
+ */
+function showIdeal(src) {
+  const viewer = $('ideal-viewer');
+  $('ideal-full').src = src;
+  const link = $('ideal-save');
+  // 前の1枚で作った URL は、ここで捨てないと残り続ける。
+  if (link.dataset.blobUrl) { URL.revokeObjectURL(link.dataset.blobUrl); delete link.dataset.blobUrl; }
+  link.href = src;
+  fetch(src).then((r) => r.blob()).then((b) => {
+    const url = URL.createObjectURL(b);
+    link.href = url;
+    link.dataset.blobUrl = url;
+    // 拡張子は中身に合わせる。png を .jpg で保存すると開けない端末がある。
+    link.download = `facematch-ideal.${(b.type.split('/')[1] ?? 'png').replace('jpeg', 'jpg')}`;
+  }).catch(() => { /* data: URL のままでも落とせる端末は多い */ });
+  viewer.hidden = false;
 }
 
 const IDEAL_KEY_STORE = 'facematch.ideal.key';
@@ -960,6 +997,13 @@ document.querySelectorAll('.face-card').forEach((card) => {
 });
 $('btn-skip').onclick = skip;
 $('btn-undo').onclick = undo;
+
+// Esc は、開いているものを上から順に閉じる。
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!$('ideal-viewer').hidden) { $('ideal-viewer').hidden = true; return; }
+  if (!$('ideal-modal').hidden) $('ideal-modal').hidden = true;
+});
 
 document.addEventListener('keydown', (e) => {
   if ($('screen-play').hidden) return;

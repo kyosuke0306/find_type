@@ -56,6 +56,10 @@ const UI_ICONS = {
   dice: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="9" cy="9" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.3" fill="currentColor" stroke="none"/>',
   chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
   sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8Z"/>',
+  // 保存：下向きの矢印とトレイ
+  download: '<path d="M12 3.5v11"/><path d="M8 11l4 4 4-4"/><path d="M4.5 17v1.5A2 2 0 0 0 6.5 20.5h11a2 2 0 0 0 2-2V17"/>',
+  // 閉じる：×
+  close: '<path d="M6 6l12 12M18 6L6 18"/>',
   check: '<path d="M4 12.5 9.5 18 20 6.5"/>',
 };
 
