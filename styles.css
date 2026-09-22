@@ -173,11 +173,23 @@ code {
   font-size: .85rem; color: var(--ink-dim);
 }
 .rounds-note b { color: var(--ink); font-weight: 700; }
-/* 「はじめる」ボタンを置かず、選んだものをもう一度押すと始まる。
-   押せば始まると分からないと動けないので、必ず見えるようにする。 */
-/* 選ばれているものは、押せば始まると分かるように強めに見せる。
-   「タップしてはじめる」の案内を外したので、押せる手がかりはここだけ。 */
-.choice-num.is-on { box-shadow: 0 4px 14px -4px var(--accent); }
+/* 「はじめる」ボタンは置かず、選んだものをもう一度押すと始まる。
+   「タップしてはじめる」の文字を外したので、押せることは見た目で伝える。
+   選ばれているものを軽く脈打たせて、指を誘う。
+
+   ずっと動かすと落ち着かないので、1周期のうち動くのは後半だけにして
+   間を空ける。変えるのは大きさと影だけなので、周りの配置は動かない。 */
+.choice-num.is-on {
+  box-shadow: 0 4px 14px -4px var(--accent);
+  animation: numPulse 2.4s ease-in-out infinite;
+}
+@keyframes numPulse {
+  0%, 62%, 100% { transform: scale(1); box-shadow: 0 4px 14px -4px var(--accent); }
+  80% { transform: scale(1.045); box-shadow: 0 7px 22px -4px var(--accent); }
+}
+/* 指を載せた時点で気づいているので、脈打ちは止めて .choice:hover の
+   浮き上がりに譲る。animation が transform を握ったままだと hover が効かない。 */
+.choice-num.is-on:hover { animation: none; }
 
 @keyframes pop { 0% { transform: scale(.7); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
 
