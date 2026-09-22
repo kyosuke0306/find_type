@@ -52,6 +52,12 @@ const VIBE = {
   // 既定。アイドルや女優くらいのかわいさを狙う。
   // 「かわいい人の中での好み」を診断するアプリなので、ここが基準線になる。
   idol: 'strikingly beautiful and very cute, as pretty as a popular idol or actress, photogenic delicate features, flawless clear skin',
+  // gemini-3-pro-image 用。pro は idol の言い回しを聞かず、証明写真のような
+  // 「実在感のある普通の人」を作る（プールとの平均距離は 0.36〜0.40 と散るが、
+  // かわいさが同梱プールの水準に届かない）。かわいさを職業として名指しし、
+  // FRAMING の「natural everyday makeup」を後ろから上書きして押し切る。
+  // パーツの語は入れない（軸の指定と競合して実測値が動かなくなる）。
+  'idol-strong': 'stunningly beautiful and very cute, a top professional idol and fashion model at the peak of her popularity, a magazine-cover face, flawless porcelain skin, exquisitely refined photogenic features, polished professional idol makeup',
   student: 'cute and pretty college student, youthful girlish and fresh-faced, soft gentle features, clear healthy skin, bare natural look',
   cute: 'cute and pretty, youthful and fresh-faced, clear healthy skin',
   neutral: '',
@@ -88,8 +94,11 @@ const EAST_ASIAN_AXES = {
   hairColor: ['jet black hair', 'dark brown hair', 'dyed light brown hair', 'dyed ash brown hair', 'dyed bleached blonde hair'],
 };
 
+// かわいさを押す vibe（idol 系）では、軸の言い回しを IDOL_AXES に差し替える。
+const isIdol = (vibe) => vibe === 'idol' || vibe === 'idol-strong';
+
 function resolveAxes(opts) {
-  const base = opts.vibe === 'idol'
+  const base = isIdol(opts.vibe)
     ? { ...AXES, ...EAST_ASIAN_AXES, ...IDOL_AXES }
     : { ...AXES, ...EAST_ASIAN_AXES };
   const range = HAIR_RANGE[opts.hair ?? 'all'];
@@ -546,7 +555,7 @@ function buildPrompts(n, opts) {
   const rand = mulberry(opts.seed);
   const eth = ETHNICITY[opts.ethnicity] ?? ETHNICITY.japanese;
   let axes = ['japanese', 'eastasian'].includes(opts.ethnicity) ? { ...AXES, ...EAST_ASIAN_AXES } : AXES;
-  if (opts.vibe === 'idol') axes = { ...axes, ...IDOL_AXES };
+  if (isIdol(opts.vibe)) axes = { ...axes, ...IDOL_AXES };
   const hairRange = HAIR_RANGE[opts.hair ?? 'all'];
   if (hairRange === undefined) throw new Error(`--hair は ${Object.keys(HAIR_RANGE).join(' / ')} のどれかです`);
   if (hairRange) axes = { ...axes, hair: hairRange };
@@ -648,7 +657,11 @@ async function generateOne(key, model, prompt, imageSize) {
     const reason = json.candidates?.[0]?.finishReason ?? json.promptFeedback?.blockReason ?? '不明';
     throw new Error(`画像が返りませんでした (${reason})`);
   }
-  return Buffer.from(b64, 'base64');
+  // 請求はトークン数で決まる。単価が分かっていないモデル（pro 系）では、
+  // 実際に作ったあとで請求額と突き合わせられるように使用量を持ち帰る。
+  // 請求は遅れて反映されるので、その場では確かめられない。
+  const u = json.usageMetadata ?? {};
+  return { buf: Buffer.from(b64, 'base64'), usage: { in: u.promptTokenCount ?? 0, out: u.candidatesTokenCount ?? 0, total: u.totalTokenCount ?? 0 } };
 }
 
 async function main() {
@@ -828,6 +841,7 @@ async function main() {
   const outDir = path.resolve(args.out);
   await fs.mkdir(outDir, { recursive: true });
   const meta = [];
+  const usages = [];
   let done = 0, failed = 0;
 
   const queue = prompts.slice();
@@ -842,8 +856,9 @@ async function main() {
       // レート制限のときだけ待って数回やり直す
       for (let attempt = 0; attempt < 4; attempt++) {
         try {
-          const buf = await generateOne(key, args.model, p.text, args.imageSize);
+          const { buf, usage } = await generateOne(key, args.model, p.text, args.imageSize);
           await fs.writeFile(file, buf);
+          usages.push(usage);
           meta.push({ file: `${name}.png`, ...p });
           done++;
           if (done % 10 === 0) console.log(`  ${done}/${prompts.length} 生成済み (失敗 ${failed})`);
@@ -864,6 +879,12 @@ async function main() {
   await Promise.all(workers);
 
   if (meta.length) await fs.writeFile(path.join(outDir, 'prompts.json'), JSON.stringify(meta, null, 1));
+  if (usages.length) {
+    const sum = (k) => usages.reduce((s, u) => s + u[k], 0);
+    console.log(`\n使ったトークン（${usages.length}枚ぶん）: 入力 ${sum('in')} / 出力 ${sum('out')} / 合計 ${sum('total')}`);
+    console.log(`  1枚あたり 出力 ${Math.round(sum('out') / usages.length)} トークン`);
+    console.log('  ※ 請求はここから決まります。単価が分からないモデルでは、後日の請求額と突き合わせてください。');
+  }
   if (budgetNote) {
     const spent = done * args.usdPerImage * args.jpyPerUsd;
     console.log(`\n${budgetNote}  実際に作った ${done}枚 → 概算 ${Math.ceil(spent)}円`);
