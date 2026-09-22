@@ -674,6 +674,8 @@ code {
   border-radius: 16px; display: block; margin: 0 auto;
 }
 .ideal-status { margin: 12px 0; color: var(--ink-dim); font-size: .9rem; }
+/* 作れなかったときは、ふつうの経過と同じ見た目で出さない */
+.ideal-status.is-error { color: var(--danger); font-weight: 700; }
 /* カードの中の1枚は、押すと全画面で開く目印として指の形にする。 */
 .ideal-stage img { cursor: zoom-in; }
 
@@ -721,7 +723,13 @@ code {
   background: transparent; color: var(--ink);
 }
 .modal-box input:focus { outline: none; border-color: var(--accent); }
-.modal-error { margin: 10px 0 0; color: #e0574f; font-size: .85rem; }
+/* 打ち間違いを知らせるところ。経過の文字と同じ見た目だと読み飛ばされる。 */
+.modal-error {
+  margin: 10px 0 0; padding: 8px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger); font-size: .85rem; font-weight: 700;
+}
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
 .modal-actions .btn { flex: 1 1 0; margin: 0; }
 

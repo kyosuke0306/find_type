@@ -2,7 +2,7 @@
 
 import { FEATURES, KEYS, FACE_KEYS, LOOK_KEYS, normalizePool, cuteScore, measurableKeys } from './features.js';
 import { partShares } from './facemap.js';
-import { buildIdealPrompt, describeIdeal, generateIdeal, PRICE_YEN } from './ideal.js';
+import { BadKey, buildIdealPrompt, describeIdeal, generateIdeal, PRICE_YEN } from './ideal.js';
 import { fit, choosePair, updateStats, newStats, score, looAccuracy, pairValue, isPlain, shouldStop, AUTO_STOP, estimateAccuracy, predict, ACC_FIT } from './model.js';
 import { icon, featureIcon } from './icons.js';
 
@@ -686,6 +686,14 @@ function setupIdeal(r) {
   $('ideal-note').textContent = 'この世界にまだ存在しない、あなたの好みだけでできた顔を、いま作ります。';
 
   const close = () => { modal.hidden = true; err.hidden = true; };
+  /** 入力し直してもらう。文言を出したまま開き、中身は選んでおく。 */
+  const reopen = (message) => {
+    err.textContent = message;
+    err.hidden = false;
+    modal.hidden = false;
+    keyBox.focus();
+    keyBox.select();
+  };
   $('btn-ideal').onclick = () => {
     err.hidden = true;
     modal.hidden = false;
@@ -707,12 +715,13 @@ function setupIdeal(r) {
 
   $('ideal-go').onclick = async () => {
     const key = keyBox.value.trim();
-    if (!key) { err.textContent = 'パスワードを入れてください。'; err.hidden = false; return; }
+    if (!key) { reopen('パスワードを入れてください。'); return; }
     close();
     try { sessionStorage.setItem(IDEAL_KEY_STORE, key); } catch { /* 保存できなくても動く */ }
 
     $('btn-ideal').disabled = true;
     status.hidden = false;
+    status.classList.remove('is-error');
     stage.hidden = true;
     status.textContent = '作っています…';
     try {
@@ -727,7 +736,19 @@ function setupIdeal(r) {
       // 300円かけて作った1枚なので、まず画面いっぱいで見せる。
       showIdeal(src);
     } catch (e) {
-      status.textContent = e.message;
+      // パスワード違いは打ち間違いなので、閉じた窓をそのまま開き直して知らせる。
+      // カードの隅に小さく出すだけだと、間違えたことに気づかないまま
+      // 「作れなかった」とだけ読まれてしまう。
+      if (e instanceof BadKey) {
+        // 間違った鍵を覚えたままにしない。次に開いたとき同じ鍵が入っていると、
+        // 押すだけでまた同じ失敗を繰り返す。
+        try { sessionStorage.removeItem(IDEAL_KEY_STORE); } catch { /* 消せなくても困らない */ }
+        status.hidden = true;
+        reopen(e.message);
+      } else {
+        status.textContent = e.message;
+        status.classList.add('is-error');
+      }
     } finally {
       $('btn-ideal').disabled = false;
     }

@@ -88,6 +88,22 @@ export function describeIdeal(r, max = 3) {
 }
 
 class Retryable extends Error {}
+/** パスワード（APIキー）が違う。作り直しても通らないので、打ち直してもらう。 */
+export class BadKey extends Error {}
+
+/**
+ * 鍵が違うときの返り方は1通りではない。
+ *   401 / 403            … 使えない鍵、権限なし
+ *   400 INVALID_ARGUMENT … 形がそもそも鍵になっていない（details に API_KEY_INVALID）
+ * 400 を「一時的な失敗」に混ぜると、4回作り直したあげく HTTP 400 としか
+ * 出ない。打ち間違いに気づけないので、ここで分けて拾う。
+ */
+function isBadKey(status, json) {
+  if (status === 401 || status === 403) return true;
+  if (status !== 400) return false;
+  const reasons = (json?.error?.details ?? []).map((d) => d?.reason);
+  return reasons.includes('API_KEY_INVALID') || /api[\s_-]?key/i.test(json?.error?.message ?? '');
+}
 
 async function once(key, prompt) {
   const res = await fetch(`${API}/models/${MODEL}:generateContent`, {
@@ -100,8 +116,8 @@ async function once(key, prompt) {
   });
   const json = await res.json().catch(() => ({}));
 
-  if (res.status === 401 || res.status === 403) {
-    throw new Error('パスワードが違います。');
+  if (isBadKey(res.status, json)) {
+    throw new BadKey('パスワードが違います。もう一度入れ直してください。');
   }
   // 混雑・一時的な失敗は作り直す。上限に当たった場合は待っても無駄なので止める。
   if (res.status === 429) {
