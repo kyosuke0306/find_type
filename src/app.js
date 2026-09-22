@@ -42,6 +42,27 @@ const state = {
 
 /* ---------------- 起動 ---------------- */
 init();
+showVersion();
+
+/**
+ * 画面の隅に版を出す。デプロイが反映されたかを目で確かめるためだけのもの。
+ *
+ * version.json は GitHub Actions がデプロイのたびに書き出す
+ * （.github/workflows/pages.yml）。手元では存在しないので dev と出す。
+ * 読めなくても診断には関係ないので、失敗しても黙って dev のままにする。
+ */
+async function showVersion() {
+  const el = $('version');
+  if (!el) return;
+  el.textContent = 'dev';
+  try {
+    // デプロイ直後に古い版を見せないよう、キャッシュは使わない。
+    const res = await fetch('version.json', { cache: 'no-store' });
+    if (!res.ok) return;
+    const v = await res.json();
+    if (v?.rev) el.textContent = v.builtAt ? `${v.rev} · ${v.builtAt}` : v.rev;
+  } catch { /* 手元で動かしているときは version.json が無い */ }
+}
 
 async function init() {
   try {

@@ -594,3 +594,21 @@ code {
 .modal-error { margin: 10px 0 0; color: #e0574f; font-size: .85rem; }
 .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
 .modal-actions .btn { flex: 1 1 0; margin: 0; }
+
+/* 版の表示。デプロイが反映されたかを隅で確かめるためだけのもの。
+   診断の邪魔をしないよう、押せないようにして、モーダルより下に置く。 */
+.version {
+  position: fixed;
+  right: calc(6px + env(safe-area-inset-right, 0px));
+  bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  z-index: 40;
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: .02em;
+  color: var(--ink-dim);
+  opacity: .45;
+  pointer-events: none;
+  user-select: none;
+}
