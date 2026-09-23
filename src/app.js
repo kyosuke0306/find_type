@@ -1072,7 +1072,7 @@ async function copyResult(r) {
     : `${Math.abs(score) >= 0.45 ? 'はっきり' : 'どちらかといえば'}${score > 0 ? 'かわいい系' : 'きれい系'}`;
   const parts = partShares(r.importance, usable).slice(0, 3);
   const text = [
-    '【顔の好み診断】',
+    '【Find your fav face】',
     `私のタイプ → ${typePhrase(r)}`,
     `内訳 → ${typeFormula(r)}`,
     `系統 → ${style}`,
