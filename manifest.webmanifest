@@ -1,7 +1,7 @@
 {
   "name": "FaceMatch",
   "short_name": "FaceMatch",
-  "description": "2枚の顔から好きなほうを選ぶだけ。繰り返すと、どんな顔がタイプかが見えてきます。",
+  "description": "Pick the face you like from each pair. After a few rounds, the kind of face that's your type comes into focus.",
   "lang": "ja",
   "start_url": "./",
   "scope": "./",
