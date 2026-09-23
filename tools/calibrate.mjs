@@ -54,7 +54,9 @@ for (let t = 0; t < TRIALS; t++) {
   const rand = mulberry(1000 + t);
   const user = makeUser(rand);
   const cmp = [];
-  const stats = newStats();
+  // 顔ごとの贔屓（luckOf）も乱数を引く。newStats() のままだと Math.random に
+  // 落ちて、同じ種でも毎回ちがう係数が出る（アプリ側は毎回ちがってよいので既定のまま）。
+  const stats = newStats(rand);
   let model = null;
   for (let r = 0; r < ROUNDS; r++) {
     const [A, B] = choosePair(pool, r >= 6 ? model : null, stats, rand);
