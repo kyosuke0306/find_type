@@ -61,7 +61,10 @@ const cuteness = (f) => (isPlain(f) ? 0 : 1);
 
 function runSession(pool, user, rounds, rand, adaptive, attr) {
   const comparisons = [];
-  const stats = newStats();
+  // 顔ごとの贔屓（luckOf）も乱数を引く。newStats() のままだと Math.random に
+  // 落ちて、同じ種でも毎回ちがう結果になる（tools/ab-check.mjs の対応のある比較が
+  // 成り立たなくなる）。アプリ側は毎回ちがってよいので既定のままでよい。
+  const stats = newStats(rand);
   let model = null;
   for (let r = 0; r < rounds; r++) {
     let A, B;
