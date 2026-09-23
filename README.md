@@ -1472,7 +1472,7 @@ npm start
 index.html          画面
 styles.css          スタイル
 manifest.webmanifest  ホーム画面に追加したときの名前とアイコンの定義
-icons/              アプリアイコンとマーク（tools/make-icon.mjs と tools/make-mark.mjs で生成）
+icons/              アプリアイコン・マーク・OG画像（tools/make-*.mjs で生成）
 src/icons.js        画面内で使う SVG アイコン
 src/features.js     診断14項目の定義と、プール内順位への正規化
 src/measure.js      ランドマークと画素からの特徴量の実測
@@ -1495,6 +1495,7 @@ tools/calibrate.mjs 出やすさをそろえる係数を求める
 tools/acc-check.mjs 画面に出す精度（20/30/45/90問）の実測
 tools/ab-check.mjs  2つのプールを同じ仮想ユーザーに解かせて比べる（対応のある比較）
 tools/make-icon.mjs / tools/make-mark.mjs  アプリアイコンとマークの生成
+tools/make-og.mjs   リンクを送ったときに出る画像（1200x630）の生成
 tools/serve.mjs     依存ゼロの静的サーバー
 test/simulate.mjs   仮想ユーザーによる推定精度の検証
 test/fixture.mjs    ダミー顔プールの生成
